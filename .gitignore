@@ -1,0 +1,86 @@
+# ==========================================
+# General / OS & Editors
+# ==========================================
+.DS_Store
+Thumbs.db
+*.pem
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==========================================
+# Environments & Secrets
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+.env*
+.env.*
+
+# ==========================================
+# Python / Backend
+# ==========================================
+# Dependency & Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python Cache & Compiled Files
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Databases
+db.sqlite3
+*.sqlite3
+db.sqlite3-journal
+
+# Django Migrations (optional, keeping folder structure)
+**/migrations/*.py
+!**/migrations/__init__.py
+**/migrations/__pycache__/
+
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ==========================================
+# Node.js / Next.js / Frontend
+# ==========================================
+# Dependency & Build Directories
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Yarn Berry PnP (relative to frontend/)
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+
+# Frontend Testing
+frontend/coverage/
+
+# Vercel
+.vercel/
+
+# Debug Logs
+*debug.log*
+*error.log*
