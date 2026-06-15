@@ -29,8 +29,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-gc16l5y&q@@2gnmck=r-w=)8y#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["api.ambady.space", "3.110.108.152"]
 
 # Application definition
 
@@ -140,4 +139,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+STATIC_ROOT = '/var/www/uno-game/static/'
