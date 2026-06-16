@@ -89,6 +89,28 @@ export default function RoomPage() {
   useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
 
   const prevGameStateRef = useRef<FilteredGameState | null>(null);
+  const chatRef = useRef<HTMLDivElement | null>(null);
+
+  // Close chat on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        isChatOpen &&
+        chatRef.current &&
+        !chatRef.current.contains(event.target as Node)
+      ) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.chat-toggle-btn')) {
+          setIsChatOpen(false);
+        }
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isChatOpen]);
 
   // Initialize mute state
   useEffect(() => {
@@ -121,7 +143,18 @@ export default function RoomPage() {
         const prevTop = prev.discard_pile?.[0];
         const currTop = current.discard_pile?.[0];
         if (currTop && currTop !== prevTop) {
-          gameSounds.play('playCard');
+          const parts = currTop.split('_');
+          const color = parts[0];
+          const val = parts[1];
+          if (val === 'WildDraw4') {
+            gameSounds.play('playPlus4');
+          } else if (val === 'Draw2') {
+            gameSounds.play('playPlus2');
+          } else if (color === 'W' && val === 'Wild') {
+            gameSounds.play('playWild');
+          } else {
+            gameSounds.play('playCard');
+          }
         }
         // Compare deck count or hand card count to detect Draw Card
         // (Only play draw card sound if a card wasn't just played in the same update)
@@ -484,6 +517,7 @@ export default function RoomPage() {
   }
 
   function handleCallOutUno(targetId: string) {
+    gameSounds.play('reportNoUno');
     sendSocketMessage('call_out_uno', { target_id: targetId });
     showAlert('Calling out player!');
   }
@@ -596,25 +630,28 @@ export default function RoomPage() {
   };
 
   const getCardStyle = (index: number, total: number) => {
-    let marginRight = '-20px';
-    if (total > 30) {
-      marginRight = '-58px';
-    } else if (total > 20) {
-      marginRight = '-54px';
-    } else if (total > 15) {
-      marginRight = '-52px';
+    // Dynamic overlaps based on total cards
+    let overlapDesktop = -30;
+    let overlapMobile = -20;
+    
+    if (total > 15) {
+      overlapDesktop = -54;
+      overlapMobile = -32;
     } else if (total > 10) {
-      marginRight = '-46px';
-    } else if (total > 7) {
-      marginRight = '-36px';
-    } else if (total > 4) {
-      marginRight = '-28px';
+      overlapDesktop = -45;
+      overlapMobile = -28;
+    } else if (total > 6) {
+      overlapDesktop = -36;
+      overlapMobile = -24;
     }
+
     return {
       zIndex: index,
       position: 'relative' as const,
-      marginRight: index === total - 1 ? '0px' : marginRight,
-    };
+      '--card-overlap': `${overlapDesktop}px`,
+      '--card-overlap-mobile': `${overlapMobile}px`,
+      marginRight: index === total - 1 ? '0px' : undefined,
+    } as React.CSSProperties;
   };
 
   const renderReverseIcon = (size: string = '100%') => (
@@ -810,7 +847,7 @@ export default function RoomPage() {
   return (
     <div className="game-layout">
       {/* Alert Overlay */}
-      {alertMessage && <div className={`game-alert ${alertType === 'success' ? 'alert-success' : 'alert-error'}`}>{alertMessage}</div>}
+      {alertMessage && <div key={alertMessage} className={`game-alert ${alertType === 'success' ? 'alert-success' : 'alert-error'}`}>{alertMessage}</div>}
 
       {/* Top Header Row / Room Status */}
       {gameState?.game_status !== 'LOBBY' && (
@@ -971,7 +1008,7 @@ export default function RoomPage() {
                 </p>
               )}
 
-              {/* Lobby Utility Action Row (Invite & Exit & Mute) */}
+              {/* Lobby Utility Action Row (Invite & Exit & Mute & Chat) */}
               <div style={{ display: 'flex', gap: 12, width: '100%' }}>
                 <button onClick={copyInviteLink} className="btn-secondary" style={{ flex: 2, minHeight: 44 }}>
                   Invite
@@ -987,6 +1024,44 @@ export default function RoomPage() {
                   title={isMuted ? 'Unmute game sounds' : 'Mute game sounds'}
                 >
                   {isMuted ? '🔇' : '🔊'}
+                </button>
+                <button
+                  onClick={() => { setIsChatOpen(!isChatOpen); if (!isChatOpen) setUnreadCount(0); }}
+                  className="btn-secondary chat-toggle-btn"
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    background: isChatOpen ? 'rgba(51,136,255,0.2)' : 'rgba(255,255,255,0.05)',
+                    color: isChatOpen ? '#3388ff' : '#fff'
+                  }}
+                  title={isChatOpen ? 'Close Chat' : 'Open Chat'}
+                >
+                  💬
+                  {!isChatOpen && unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -5,
+                      background: '#ff3333',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      minWidth: 16,
+                      height: 16,
+                      lineHeight: '16px',
+                      textAlign: 'center',
+                      padding: '0 3px',
+                      boxShadow: '0 0 6px rgba(255,51,51,0.7)'
+                    }}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </button>
                 <button onClick={handleLeaveRoom} className="btn-secondary" style={{ flex: 2, minHeight: 44, borderColor: 'rgba(255,51,51,0.3)', color: '#ff5555' }}>
                   Exit
@@ -1085,7 +1160,7 @@ export default function RoomPage() {
               </div>
 
               {/* Discard Pile Top Card */}
-              {gameState.discard_pile.length > 0 && renderUnoCard(gameState.discard_pile[0], undefined, { cursor: 'default' })}
+              {gameState.discard_pile.length > 0 && renderUnoCard(gameState.discard_pile[0], undefined, { cursor: 'default', animation: 'card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }, gameState.discard_pile[0])}
             </div>
 
             {/* Play direction arrow indicator */}
@@ -1148,6 +1223,118 @@ export default function RoomPage() {
                   🎴 No playable cards — draw from the deck!
                 </div>
               )}
+
+            {/* Action buttons on the table felt */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              marginTop: 12,
+              zIndex: 30
+            }}>
+              {/* UNO shout button */}
+              <button
+                onClick={handleCallUno}
+                className="btn-uno-shout"
+                disabled={!canShoutUno}
+              >
+                UNO
+              </button>
+
+              {/* "Player didn't call UNO!" pill */}
+              {targetNoUnoPlayer && (
+                <button
+                  onClick={handleReportNoUno}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    background: 'linear-gradient(135deg, #cc2200, #ff4400)',
+                    border: '2px solid #ff6600',
+                    borderRadius: 24,
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    padding: '6px 14px',
+                    cursor: 'pointer',
+                    boxShadow: '0 0 14px rgba(255,68,0,0.7)',
+                    animation: 'pulse 1.2s infinite',
+                    whiteSpace: 'nowrap',
+                    letterSpacing: 0.3
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>🚨</span>
+                  {targetNoUnoPlayer.name}<span style={{ fontSize: 14 }}> didn&apos;t call UNO!</span>
+                </button>
+              )}
+
+              {/* Pass Turn */}
+              {gameState.has_drawn_this_turn && isMyTurn && (gameState.draw_penalty || 0) === 0 && (
+                <button
+                  onClick={handlePassTurn}
+                  className="btn-primary"
+                  style={{
+                    background: '#00cc66',
+                    color: '#fff',
+                    minHeight: 44,
+                    padding: '0 20px',
+                    width: 'auto',
+                    borderRadius: 12,
+                    fontSize: 14,
+                    fontWeight: 800,
+                    boxShadow: '0 0 12px rgba(0,204,102,0.4)',
+                    letterSpacing: 0.5
+                  }}
+                >
+                  ✓ Pass
+                </button>
+              )}
+
+              {/* Chat Toggle Button */}
+              <button
+                onClick={() => { setIsChatOpen(!isChatOpen); if (!isChatOpen) setUnreadCount(0); }}
+                className="chat-toggle-btn"
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  border: '1px solid var(--border-glass)',
+                  background: isChatOpen ? 'rgba(51,136,255,0.2)' : 'rgba(255,255,255,0.1)',
+                  color: isChatOpen ? '#3388ff' : '#fff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  position: 'relative',
+                  transition: 'background 0.2s, color 0.2s'
+                }}
+                title={isChatOpen ? 'Close Chat' : 'Open Chat'}
+              >
+                💬
+                {!isChatOpen && unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: -5,
+                    right: -5,
+                    background: '#ff3333',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    minWidth: 16,
+                    height: 16,
+                    lineHeight: '16px',
+                    textAlign: 'center',
+                    padding: '0 3px',
+                    boxShadow: '0 0 6px rgba(255,51,51,0.7)'
+                  }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Right Zone */}
@@ -1269,111 +1456,8 @@ export default function RoomPage() {
         </div>
       )}
 
-      {/* Action Bar */}
-      <div className="action-bar" style={{ zIndex: 30, position: 'relative', padding: '8px 12px', gap: 8 }}>
-
-        {/* Left cluster: UNO + No UNO callout */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-          {gameState?.game_status === 'PLAYING' && (
-            <>
-              {/* UNO shout button */}
-              <button
-                onClick={handleCallUno}
-                className="btn-uno-shout"
-                disabled={!canShoutUno}
-              >
-                UNO
-              </button>
-
-              {/* "Player didn't call UNO!" pill — only shows when there's a target */}
-              {targetNoUnoPlayer && (
-                <button
-                  onClick={handleReportNoUno}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    background: 'linear-gradient(135deg, #cc2200, #ff4400)',
-                    border: '2px solid #ff6600',
-                    borderRadius: 24,
-                    color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    padding: '6px 14px',
-                    cursor: 'pointer',
-                    boxShadow: '0 0 14px rgba(255,68,0,0.7)',
-                    animation: 'pulse 1.2s infinite',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: 0.3
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>🚨</span>
-                  {targetNoUnoPlayer.name} didn&apos;t call UNO!
-                </button>
-              )}
-
-              {/* Pass Turn */}
-              {gameState.has_drawn_this_turn && isMyTurn && (gameState.draw_penalty || 0) === 0 && (
-                <button
-                  onClick={handlePassTurn}
-                  className="btn-primary"
-                  style={{ background: '#00cc66', color: '#fff', minHeight: 52, padding: '0 28px', width: 'auto', borderRadius: 14, fontSize: 15, fontWeight: 800, boxShadow: '0 0 16px rgba(0,204,102,0.5)', letterSpacing: 0.5 }}
-                >
-                  ✓ Pass Turn
-                </button>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Right: small Chat icon button */}
-        <button
-          onClick={() => { setIsChatOpen(!isChatOpen); if (!isChatOpen) setUnreadCount(0); }}
-          style={{
-            flexShrink: 0,
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            border: '1px solid var(--border-glass)',
-            background: isChatOpen ? 'rgba(51,136,255,0.2)' : 'rgba(255,255,255,0.06)',
-            color: isChatOpen ? '#3388ff' : '#fff',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 18,
-            position: 'relative',
-            transition: 'background 0.2s, color 0.2s'
-          }}
-          title={isChatOpen ? 'Close Chat' : 'Open Chat'}
-        >
-          💬
-          {!isChatOpen && unreadCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: -5,
-              right: -5,
-              background: '#ff3333',
-              color: '#fff',
-              borderRadius: '50%',
-              fontSize: 10,
-              fontWeight: 800,
-              minWidth: 16,
-              height: 16,
-              lineHeight: '16px',
-              textAlign: 'center',
-              padding: '0 3px',
-              boxShadow: '0 0 6px rgba(255,51,51,0.7)'
-            }}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-      </div>
-
-
       {/* Chat sliding drawer */}
-      <div className={`chat-drawer ${isChatOpen ? 'open' : ''}`}>
+      <div ref={chatRef} className={`chat-drawer ${isChatOpen ? 'open' : ''}`}>
         <div style={{
           padding: 16,
           borderBottom: '1px solid var(--border-glass)',
@@ -1428,7 +1512,7 @@ export default function RoomPage() {
 
       {/* Wild Card Color Picker Modal */}
       {pendingWildCard && (
-        <div style={{
+        <div className="modal-overlay-animate" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1442,7 +1526,7 @@ export default function RoomPage() {
           zIndex: 9999,
           padding: 24
         }}>
-          <div className="glass-panel" style={{
+          <div className="glass-panel modal-content-animate" style={{
             padding: 32,
             maxWidth: 380,
             width: '100%',
@@ -1510,7 +1594,7 @@ export default function RoomPage() {
 
       {/* Custom Confirmation Modal Overlay */}
       {activeConfirm && (
-        <div style={{
+        <div className="modal-overlay-animate" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1524,7 +1608,7 @@ export default function RoomPage() {
           zIndex: 9999,
           padding: 24
         }}>
-          <div className="glass-panel" style={{
+          <div className="glass-panel modal-content-animate" style={{
             padding: 28,
             maxWidth: 400,
             width: '100%',

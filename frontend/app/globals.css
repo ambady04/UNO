@@ -80,13 +80,13 @@ body {
   color: #000;
   background: #ffffff;
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.2s;
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.2s ease, background-color 0.2s ease;
   touch-action: manipulation;
   min-height: 44px;
 }
 
 .btn-primary:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
   opacity: 0.9;
 }
 
@@ -100,13 +100,13 @@ body {
   color: #fff;
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: transform 0.1s, background 0.2s;
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.2s ease, border-color 0.2s ease;
   touch-action: manipulation;
   min-height: 44px;
 }
 
 .btn-secondary:active {
-  transform: scale(0.98);
+  transform: scale(0.95);
   background: rgba(255, 255, 255, 0.1);
 }
 
@@ -150,6 +150,15 @@ body {
   margin: 4px;
   gap: 8px;
   overflow: hidden;
+}
+
+@media (max-width: 499px) {
+  .table-felt {
+    max-height: 42vh;
+    margin: 2px;
+    border-width: 3.5px;
+    border-radius: 16px;
+  }
 }
 
 /* Opponent Zones */
@@ -253,54 +262,40 @@ body {
   z-index: 10;
 }
 
-/* PREMIUM CARD DESIGN (WHITE BACKGROUND, THICK BORDER) */
+/* PREMIUM CARD DESIGN - COLOR BACKGROUNDS */
 .uno-card {
-  width: 72px;
-  height: 108px;
-  border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  width: 90px;
+  height: 135px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 5px;
+  padding: 6px;
   box-sizing: border-box;
   position: relative;
   user-select: none;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.25s cubic-bezier(0.25, 1, 0.5, 1), filter 0.25s ease, opacity 0.25s ease;
   overflow: hidden;
 }
 
 @media (max-width: 1199px) {
   .uno-card {
-    width: 58px;
-    height: 88px;
-    padding: 4px;
-  }
-  .card-center-solid-circle {
-    width: 28px;
-    height: 28px;
-  }
-  .card-center-solid-circle span {
-    font-size: 16px;
-  }
-  .card-center-wild-pill {
-    width: 36px;
-    height: 36px;
-  }
-  .card-center-wild-pill span {
-    font-size: 13px;
+    width: 76px;
+    height: 114px;
+    padding: 5px;
+    border-radius: 8px;
   }
 }
 
 @media (max-width: 499px) {
   .uno-card {
-    width: 52px;
-    height: 78px;
-    padding: 3px;
-    border-radius: 6px;
+    width: 66px;
+    height: 99px;
+    padding: 4px;
+    border-radius: 7px;
   }
 }
 
@@ -308,43 +303,75 @@ body {
 .uno-card::before {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  right: 3px;
-  bottom: 3px;
-  border: 3.5px solid currentColor;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 2.2px solid currentColor;
   border-radius: 6px;
   pointer-events: none;
   z-index: 1;
 }
 
+@media (max-width: 1199px) {
+  .uno-card::before {
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    border-width: 1.8px;
+    border-radius: 5px;
+  }
+}
+
+@media (max-width: 499px) {
+  .uno-card::before {
+    top: 2.5px;
+    left: 2.5px;
+    right: 2.5px;
+    bottom: 2.5px;
+    border-width: 1.5px;
+    border-radius: 4.5px;
+  }
+}
+
 /* Hover/Active states */
 .uno-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   z-index: 10;
 }
 
 .uno-card:active {
-  transform: translateY(-8px) scale(1.05) !important;
+  transform: translateY(-10px) scale(1.05) !important;
   z-index: 50;
 }
 
 /* Card Colors */
 .card-red {
-  color: #e52521;
+  background-color: #e52521 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 .card-yellow {
-  color: #f5c400;
+  background-color: #e6b800 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 .card-green {
-  color: #2ba84a;
+  background-color: #2ba84a !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 .card-blue {
-  color: #0076a3;
+  background-color: #0076a3 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 .card-wild {
-  color: #1e1e24;
+  background-color: #151518 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* Back of card */
@@ -372,7 +399,7 @@ body {
 
 /* Card layout segments */
 .card-corner {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 900;
   z-index: 2;
   line-height: 1;
@@ -382,11 +409,43 @@ body {
 
 .card-corner.top-left {
   align-self: flex-start;
+  margin-top: 6px;
+  margin-left: 6px;
 }
 
 .card-corner.bottom-right {
   align-self: flex-end;
   transform: rotate(180deg);
+  margin-top: 6px;
+  margin-left: 6px;
+}
+
+@media (max-width: 1199px) {
+  .card-corner {
+    font-size: 11px;
+  }
+  .card-corner.top-left {
+    margin-top: 4px;
+    margin-left: 4px;
+  }
+  .card-corner.bottom-right {
+    margin-top: 4px;
+    margin-left: 4px;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-corner {
+    font-size: 10px;
+  }
+  .card-corner.top-left {
+    margin-top: 3px;
+    margin-left: 3px;
+  }
+  .card-corner.bottom-right {
+    margin-top: 3px;
+    margin-left: 3px;
+  }
 }
 
 .card-center {
@@ -400,51 +459,138 @@ body {
   height: 100%;
 }
 
-/* Rotated light oval outline */
+/* Rotated solid white oval background for action cards */
 .card-center-oval {
-  width: 85%;
-  height: 70%;
-  border: 1px solid rgba(0,0,0,0.08);
+  width: 66px;
+  height: 48px;
+  background-color: #ffffff !important;
   border-radius: 50%;
   transform: rotate(-28deg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  border: none !important;
+}
+
+@media (max-width: 1199px) {
+  .card-center-oval {
+    width: 55px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-center-oval {
+    width: 46px;
+    height: 34px;
+  }
+}
+
+.card-red .card-center-oval {
+  color: #e52521 !important;
+}
+.card-yellow .card-center-oval {
+  color: #e6b800 !important;
+}
+.card-green .card-center-oval {
+  color: #2ba84a !important;
+}
+.card-blue .card-center-oval {
+  color: #0076a3 !important;
+}
+
+/* Un-rotated, outlined action card values */
+.card-center-value {
+  display: inline-block;
+  transform: rotate(28deg);
+  font-size: 32px;
   font-weight: 900;
 }
 
-.card-center-value {
-  transform: rotate(28deg); /* Un-rotate center number */
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+@media (max-width: 1199px) {
+  .card-center-value {
+    font-size: 26px;
+  }
 }
 
-/* Circle design for numbers */
+@media (max-width: 499px) {
+  .card-center-value {
+    font-size: 22px;
+  }
+}
+
+/* Un-rotate and add drop-shadow to Reverse SVG arrow icons */
+.card-center-oval svg {
+  transform: rotate(28deg);
+}
+
+/* Rotated solid white oval background for number cards */
 .card-center-solid-circle {
-  width: 36px;
-  height: 36px;
+  width: 62px;
+  height: 46px;
   border-radius: 50%;
-  background-color: currentColor;
+  background-color: #ffffff !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1.5px 3px rgba(0,0,0,0.15);
+  transform: rotate(-28deg);
 }
 
+@media (max-width: 1199px) {
+  .card-center-solid-circle {
+    width: 52px;
+    height: 38px;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-center-solid-circle {
+    width: 44px;
+    height: 32px;
+  }
+}
+
+/* Un-rotated, outlined numbers inside */
 .card-center-solid-circle span {
-  color: #ffffff;
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 900;
+  display: inline-block;
+  transform: rotate(28deg);
+}
+
+.card-red .card-center-solid-circle span {
+  color: #e52521 !important;
+}
+.card-yellow .card-center-solid-circle span {
+  color: #e6b800 !important;
+}
+.card-green .card-center-solid-circle span {
+  color: #2ba84a !important;
+}
+.card-blue .card-center-solid-circle span {
+  color: #0076a3 !important;
+}
+
+@media (max-width: 1199px) {
+  .card-center-solid-circle span {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-center-solid-circle span {
+    font-size: 18px;
+  }
 }
 
 /* Diagonal Split Pill/Circle for Wild Cards */
 .card-center-wild-pill {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: conic-gradient(
     #e52521 0% 25%, 
-    #f5c400 25% 50%, 
+    #e6b800 25% 50%, 
     #2ba84a 50% 75%, 
     #0076a3 75% 100%
   );
@@ -453,15 +599,37 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 4px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.25);
-  border: 2px solid #ffffff;
+  border: 2.5px solid #ffffff;
 }
 
 .card-center-wild-pill span {
   color: #ffffff;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8), -1px -1px 3px rgba(0, 0, 0, 0.8);
   transform: rotate(30deg);
+}
+
+@media (max-width: 1199px) {
+  .card-center-wild-pill {
+    width: 42px;
+    height: 42px;
+    border-width: 2px;
+  }
+  .card-center-wild-pill span {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-center-wild-pill {
+    width: 34px;
+    height: 34px;
+    border-width: 1.5px;
+  }
+  .card-center-wild-pill span {
+    font-size: 12px;
+  }
 }
 
 .hand-wrapper {
@@ -498,14 +666,24 @@ body {
 }
 
 .hand-card-wrapper {
-  margin-right: -36px;
-  transition: transform 0.15s;
+  margin-right: var(--card-overlap, -36px);
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
   flex-shrink: 0;
+  animation: card-draw 0.35s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .hand-card-wrapper:hover {
-  transform: translateY(-12px);
+  transform: translateY(-16px) !important;
   z-index: 100 !important;
+}
+
+@media (max-width: 499px) {
+  .hand-card-wrapper {
+    margin-right: var(--card-overlap-mobile, -24px);
+  }
+  .hand-card-wrapper:hover {
+    transform: translateY(-10px) !important;
+  }
 }
 
 .hand-card-wrapper:last-child {
@@ -694,6 +872,7 @@ body {
   z-index: 200;
   pointer-events: none;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  animation: alert-life 4.0s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 .alert-error {
@@ -753,6 +932,83 @@ body {
   100% {
     transform: translateY(0px);
   }
+}
+
+.lobby-logo {
+  animation: logo-float 4s ease-in-out infinite;
+}
+
+/* Premium Animations & Keyframes */
+
+@keyframes card-draw {
+  from {
+    transform: translateY(60px) scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes card-pop {
+  from {
+    transform: scale(0.4) rotate(-10deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes alert-life {
+  0% {
+    transform: translate(-50%, -24px);
+    opacity: 0;
+  }
+  8% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  92% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -24px);
+    opacity: 0;
+  }
+}
+
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes modal-scale-in {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-overlay-animate {
+  animation: overlay-fade-in 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.modal-content-animate {
+  animation: modal-scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .lobby-logo {
