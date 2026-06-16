@@ -129,16 +129,7 @@ function HomeContent() {
             filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.4))'
           }}
         />
-        <h1 style={{
-          fontSize: 36,
-          margin: 0,
-          fontWeight: 900,
-          letterSpacing: 2,
-          background: 'linear-gradient(135deg, #ffee33 0%, #ff9900 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}>
+        <h1 className="lobby-title">
           UNO! MULTIPLAYER
         </h1>
         <p style={{ margin: '4px 0 0 0', opacity: 0.6, fontSize: 14 }}>

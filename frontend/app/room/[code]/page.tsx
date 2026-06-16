@@ -66,6 +66,7 @@ export default function RoomPage() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Custom Confirmation Dialog State
   const [activeConfirm, setActiveConfirm] = useState<{
@@ -87,6 +88,17 @@ export default function RoomPage() {
 
   // Keep the ref in sync with the state
   useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
+
+  // Listen for mobile viewport sizes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const prevGameStateRef = useRef<FilteredGameState | null>(null);
   const chatRef = useRef<HTMLDivElement | null>(null);
@@ -661,7 +673,14 @@ export default function RoomPage() {
     </svg>
   );
 
-  function renderUnoCard(cardStr: string, onClick?: () => void, extraStyle?: React.CSSProperties, keyProp?: any) {
+  function renderUnoCard(
+    cardStr: string,
+    onClick?: () => void,
+    extraStyle?: React.CSSProperties,
+    keyProp?: any,
+    isPlayable?: boolean,
+    isSelected?: boolean
+  ) {
     const parts = cardStr.split('_');
     const color = parts[0];
     const val = parts[1] || '';
@@ -673,9 +692,11 @@ export default function RoomPage() {
     else if (color === 'B') colorClass = 'card-blue';
     else if (color === 'W') colorClass = 'card-wild';
 
+    const cardClasses = `uno-card ${colorClass} ${isPlayable ? 'playable' : ''} ${isSelected ? 'selected-card' : ''}`;
+
     if (colorClass === 'card-back') {
       return (
-        <div key={keyProp} className="uno-card card-back" onClick={onClick} style={extraStyle} />
+        <div key={keyProp} className={cardClasses} onClick={onClick} style={extraStyle} />
       );
     }
 
@@ -697,7 +718,7 @@ export default function RoomPage() {
     const isNumber = !isWild && !isAction;
 
     return (
-      <div key={keyProp} className={`uno-card ${colorClass}`} onClick={onClick} style={extraStyle}>
+      <div key={keyProp} className={cardClasses} onClick={onClick} style={extraStyle}>
         <div className="card-corner top-left">{cornerLabel}</div>
         <div className="card-center">
           {isWild ? (
@@ -725,6 +746,30 @@ export default function RoomPage() {
     );
   }
 
+  // Auto-pass turn if the player draws a card and still has no playable cards
+  useEffect(() => {
+    if (!gameState) return;
+    const activePlayer = gameState.players[gameState.current_turn];
+    const isMyTurnNow = activePlayer?.id === guest?.token;
+
+    if (
+      gameState.game_status === 'PLAYING' &&
+      isMyTurnNow &&
+      gameState.has_drawn_this_turn &&
+      (gameState.draw_penalty || 0) === 0
+    ) {
+      const hasPlayableCard = gameState.hand.some(c => checkPlayableClient(c));
+      if (!hasPlayableCard) {
+        console.log("Auto-passing turn: no playable cards in hand after drawing.");
+        // Delay slightly (800ms) to allow the player to see what card they drew
+        const timer = setTimeout(() => {
+          handlePassTurn();
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [gameState, guest]);
+
   if (loading || !gameState) {
     return (
       <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>
@@ -737,6 +782,11 @@ export default function RoomPage() {
   const isMyTurn = activePlayer?.id === guest?.token;
   const myPlayer = gameState?.players.find(p => p.id === guest?.token);
   const canShoutUno = !!gameState && gameState.hand.length === 1 && !myPlayer?.called_uno;
+
+  const needsToDraw = !!gameState && isMyTurn && (
+    (gameState.draw_penalty || 0) > 0 ||
+    (!gameState.has_drawn_this_turn && gameState.hand.every(c => !checkPlayableClient(c)))
+  );
 
   const targetNoUnoPlayer = gameState?.players.find(
     p => p.id !== guest?.token && p.card_count === 1 && !p.called_uno
@@ -762,6 +812,72 @@ export default function RoomPage() {
     opponents.forEach((op) => {
       topOpponents.push(op);
     });
+  }
+
+  function renderCompactOpponent(p: PlayerState) {
+    const isActive = activePlayer?.id === p.id;
+    const initial = p.name ? p.name.charAt(0).toUpperCase() : '?';
+    return (
+      <div
+        key={p.id}
+        className={`compact-opponent-card ${isActive ? 'active-turn' : ''} ${!p.is_connected ? 'offline' : ''}`}
+        style={{ position: 'relative', cursor: (p.card_count === 1 && !p.called_uno) ? 'pointer' : 'default' }}
+        onClick={() => {
+          if (p.card_count === 1 && !p.called_uno) {
+            handleCallOutUno(p.id);
+          }
+        }}
+      >
+        {roomDetails?.host_id === guest?.token && p.id !== guest?.token && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleKickPlayer(p.id);
+            }}
+            style={{
+              position: 'absolute',
+              top: -4,
+              left: -4,
+              background: '#ff3333',
+              border: 'none',
+              borderRadius: '50%',
+              color: '#fff',
+              fontSize: 9,
+              width: 14,
+              height: 14,
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+            }}
+            title={`Kick ${p.name}`}
+          >
+            ×
+          </button>
+        )}
+
+        <div className="compact-opponent-avatar">
+          {initial}
+        </div>
+
+        <span className="compact-opponent-name">{p.name}</span>
+
+        {p.card_count > 0 && (
+          <span className="compact-opponent-badge">
+            🎴{p.card_count}
+          </span>
+        )}
+
+        {p.called_uno && (
+          <span className="compact-opponent-uno">
+            UNO
+          </span>
+        )}
+      </div>
+    );
   }
 
   function renderOpponentAvatar(p: PlayerState) {
@@ -851,7 +967,7 @@ export default function RoomPage() {
 
       {/* Top Header Row / Room Status */}
       {gameState?.game_status !== 'LOBBY' && (
-        <div style={{
+        <div className="game-header" style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -1075,6 +1191,13 @@ export default function RoomPage() {
       {/* PLAYING STATE SCREEN: TABLETOP EXPERIENCE */}
       {gameState?.game_status === 'PLAYING' && (
         <div className="uno-table">
+          {/* Mobile Compact Opponents Row */}
+          {isMobile && topOpponents.length > 0 && (
+            <div className="compact-opponents-row">
+              {topOpponents.map(renderCompactOpponent)}
+            </div>
+          )}
+
           {/* Top Zone */}
           <div className="opponents-top">
             {topOpponents.map(renderOpponentAvatar)}
@@ -1087,35 +1210,51 @@ export default function RoomPage() {
 
           {/* Central Play Table (Felt Style) */}
           <div className="table-felt">
-            {/* Turn Announcement */}
-            <div style={{
-              padding: '6px 16px',
-              borderRadius: 12,
-              background: 'rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: isMyTurn ? '#ffcc00' : '#fff',
-              fontSize: 13,
-              fontWeight: 700
-            }}>
-              {isMyTurn ? '👉 YOUR TURN 👈' : `${activePlayer?.name}'s Turn`}
-            </div>
+            {/* Table Header Row (Turn, Color & Direction combined) */}
+            <div className="table-header-row" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', zIndex: 30 }}>
+              {/* Turn Announcement */}
+              <div style={{
+                padding: '5px 12px',
+                borderRadius: 12,
+                background: 'rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: isMyTurn ? '#ffcc00' : '#fff',
+                fontSize: 12,
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }}>
+                {isMyTurn ? '👉 YOUR TURN 👈' : `${activePlayer?.name}'s Turn`}
+              </div>
 
-            {/* Current Active Color banner */}
-            <div className="color-banner" style={{
-              background:
-                gameState.current_color === 'R' ? 'var(--color-red)' :
-                  gameState.current_color === 'Y' ? 'var(--color-yellow)' :
-                    gameState.current_color === 'G' ? 'var(--color-green)' :
-                      gameState.current_color === 'B' ? 'var(--color-blue)' : '#333',
-              color: gameState.current_color === 'Y' ? '#000' : '#fff',
-              fontWeight: 900
-            }}>
-              COLOR: {
-                gameState.current_color === 'R' ? 'Red' :
-                  gameState.current_color === 'Y' ? 'Yellow' :
-                    gameState.current_color === 'G' ? 'Green' :
-                      gameState.current_color === 'B' ? 'Blue' : 'None'
-              }
+              {/* Current Active Color banner with Direction Symbol */}
+              <div className="color-banner" style={{
+                background:
+                  gameState.current_color === 'R' ? 'var(--color-red)' :
+                    gameState.current_color === 'Y' ? 'var(--color-yellow)' :
+                      gameState.current_color === 'G' ? 'var(--color-green)' :
+                        gameState.current_color === 'B' ? 'var(--color-blue)' : '#333',
+                color: gameState.current_color === 'Y' ? '#000' : '#fff',
+                fontWeight: 900,
+                padding: '5px 12px',
+                fontSize: 12,
+                borderRadius: 12,
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <span>
+                  COLOR: {
+                    gameState.current_color === 'R' ? 'Red' :
+                      gameState.current_color === 'Y' ? 'Yellow' :
+                        gameState.current_color === 'G' ? 'Green' :
+                          gameState.current_color === 'B' ? 'Blue' : 'None'
+                  }
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 'bold' }}>
+                  {gameState.direction === 1 ? '↻' : '↺'}
+                </span>
+              </div>
             </div>
 
             {/* Draw Pile and Discard Pile */}
@@ -1123,7 +1262,7 @@ export default function RoomPage() {
               {/* Draw Deck Stack */}
               <div
                 onClick={handleDrawCard}
-                className="uno-card card-back"
+                className={`uno-card card-back deck-stack-3d ${needsToDraw ? 'active-turn' : ''}`}
                 style={{
                   cursor: isMyTurn && (!gameState.has_drawn_this_turn || (gameState.draw_penalty || 0) > 0) ? 'pointer' : 'not-allowed',
                   opacity: isMyTurn && (!gameState.has_drawn_this_turn || (gameState.draw_penalty || 0) > 0) ? 1 : 0.7,
@@ -1150,38 +1289,13 @@ export default function RoomPage() {
                   {gameState.deck_count}
                 </div>
 
-                {(gameState.draw_penalty || 0) > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: -10,
-                    right: -10,
-                    background: '#ff3333',
-                    color: '#fff',
-                    borderRadius: '50%',
-                    width: 24,
-                    height: 24,
-                    fontSize: 11,
-                    fontWeight: 'bold',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 8px rgba(255, 51, 51, 0.8)',
-                    zIndex: 21,
-                    animation: 'pulse 1.2s infinite'
-                  }}>
-                    +{gameState.draw_penalty}
-                  </div>
-                )}
               </div>
 
               {/* Discard Pile Top Card */}
               {gameState.discard_pile.length > 0 && renderUnoCard(gameState.discard_pile[0], undefined, { cursor: 'default', animation: 'card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }, gameState.discard_pile[0])}
             </div>
 
-            {/* Play direction arrow indicator */}
-            <div style={{ fontSize: 11, opacity: 0.6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.3)', padding: '4px 8px', borderRadius: 8 }}>
-              {gameState.direction === 1 ? 'Direction: Clockwise ↻' : 'Direction: Counter-Clockwise ↺'}
-            </div>
+
 
             {/* Draw Penalty Alert — only shown to the active player who must draw */}
             {(gameState.draw_penalty || 0) > 0 && isMyTurn && (
@@ -1198,7 +1312,8 @@ export default function RoomPage() {
                 fontSize: 14,
                 letterSpacing: 0.4,
                 boxShadow: '0 0 16px rgba(255,51,51,0.25)',
-                animation: 'pulse 1.2s infinite'
+                animation: 'pulse 1.2s infinite',
+                marginTop: 12
               }}>
                 ⚠️ Draw {gameState.draw_penalty} card{gameState.draw_penalty !== 1 ? 's' : ''}! Click the deck!
               </div>
@@ -1214,7 +1329,8 @@ export default function RoomPage() {
                 border: '1px solid rgba(255,80,80,0.2)',
                 borderRadius: 8,
                 padding: '3px 12px',
-                color: '#ff8888'
+                color: '#ff8888',
+                marginTop: 12
               }}>
                 {activePlayer?.name} must draw {gameState.draw_penalty} card{gameState.draw_penalty !== 1 ? 's' : ''}
               </div>
@@ -1233,14 +1349,15 @@ export default function RoomPage() {
                   padding: '5px 14px',
                   color: '#ffaa00',
                   fontWeight: 700,
-                  fontSize: 12
+                  fontSize: 12,
+                  marginTop: 12
                 }}>
                   🎴 No playable cards — draw from the deck!
                 </div>
               )}
 
             {/* Action buttons on the table felt */}
-            <div style={{
+            <div className="table-action-row" style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1285,7 +1402,7 @@ export default function RoomPage() {
               )}
 
               {/* Pass Turn */}
-              {gameState.has_drawn_this_turn && isMyTurn && (gameState.draw_penalty || 0) === 0 && (
+              {gameState.has_drawn_this_turn && isMyTurn && (gameState.draw_penalty || 0) === 0 && gameState.hand.some(c => checkPlayableClient(c)) && (
                 <button
                   onClick={handlePassTurn}
                   className="btn-primary"
@@ -1306,50 +1423,51 @@ export default function RoomPage() {
                 </button>
               )}
 
-              {/* Chat Toggle Button */}
-              <button
-                onClick={() => { setIsChatOpen(!isChatOpen); if (!isChatOpen) setUnreadCount(0); }}
-                className="chat-toggle-btn"
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  border: '1px solid var(--border-glass)',
-                  background: isChatOpen ? 'rgba(51,136,255,0.2)' : 'rgba(255,255,255,0.1)',
-                  color: isChatOpen ? '#3388ff' : '#fff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 18,
-                  position: 'relative',
-                  transition: 'background 0.2s, color 0.2s'
-                }}
-                title={isChatOpen ? 'Close Chat' : 'Open Chat'}
-              >
-                💬
-                {!isChatOpen && unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: -5,
-                    right: -5,
-                    background: '#ff3333',
-                    color: '#fff',
-                    borderRadius: '50%',
-                    fontSize: 10,
-                    fontWeight: 800,
-                    minWidth: 16,
-                    height: 16,
-                    lineHeight: '16px',
-                    textAlign: 'center',
-                    padding: '0 3px',
-                    boxShadow: '0 0 6px rgba(255,51,51,0.7)'
-                  }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
             </div>
+
+            {/* Chat Toggle Button (Bottom Right of green table felt) */}
+            <button
+              onClick={() => { setIsChatOpen(!isChatOpen); if (!isChatOpen) setUnreadCount(0); }}
+              className="chat-toggle-btn"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid var(--border-glass)',
+                background: isChatOpen ? 'rgba(51,136,255,0.2)' : 'rgba(255,255,255,0.1)',
+                color: isChatOpen ? '#3388ff' : '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 18,
+                position: 'relative',
+                transition: 'background 0.2s, color 0.2s'
+              }}
+              title={isChatOpen ? 'Close Chat' : 'Open Chat'}
+            >
+              💬
+              {!isChatOpen && unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                  background: '#ff3333',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  minWidth: 16,
+                  height: 16,
+                  lineHeight: '16px',
+                  textAlign: 'center',
+                  padding: '0 3px',
+                  boxShadow: '0 0 6px rgba(255,51,51,0.7)'
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Right Zone */}
@@ -1392,12 +1510,19 @@ export default function RoomPage() {
                       key={idx}
                       style={getCardStyle(idx, gameState.hand.length)}
                     >
-                      {renderUnoCard(card, () => handlePlayCard(card), {
-                        transform: isCardPlayable ? 'translateY(-8px)' : 'scale(0.95)',
-                        opacity: 1,
-                        filter: isCardPlayable ? 'none' : 'brightness(0.55) grayscale(0.25)',
-                        cursor: isCardPlayable ? 'pointer' : 'not-allowed'
-                      })}
+                      {renderUnoCard(
+                        card, 
+                        () => handlePlayCard(card), 
+                        {
+                          transform: isCardPlayable ? 'translateY(-8px)' : 'scale(0.95)',
+                          opacity: 1,
+                          filter: isCardPlayable ? 'none' : 'brightness(0.55) grayscale(0.25)',
+                          cursor: isCardPlayable ? 'pointer' : 'not-allowed'
+                        },
+                        idx,
+                        isCardPlayable,
+                        false
+                      )}
                     </div>
                   );
                 })}
