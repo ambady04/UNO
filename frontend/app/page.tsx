@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @next/next/no-img-element */
+
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -127,16 +129,7 @@ function HomeContent() {
             filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.4))'
           }}
         />
-        <h1 style={{
-          fontSize: 36,
-          margin: 0,
-          fontWeight: 900,
-          letterSpacing: 2,
-          background: 'linear-gradient(135deg, #ffee33 0%, #ff9900 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}>
+        <h1 className="lobby-title">
           UNO! MULTIPLAYER
         </h1>
         <p style={{ margin: '4px 0 0 0', opacity: 0.6, fontSize: 14 }}>
@@ -183,7 +176,7 @@ function HomeContent() {
             />
           </div>
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? (redirectCode ? 'Joining Room...' : 'Registering...') : (redirectCode ? `Join Room ${redirectCode.toUpperCase()}` : 'Play as Guest')}
+            {loading ? (redirectCode ? 'Joining Room...' : 'Registering...') : (redirectCode ? `Join Room ${redirectCode.toUpperCase()}` : 'Enter')}
           </button>
         </form>
       ) : (

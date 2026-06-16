@@ -18,6 +18,28 @@ export const metadata: Metadata = {
   icons: {
     icon: "/uno-logo.svg",
   },
+  openGraph: {
+    title: "UNO! Real-Time Multiplayer",
+    description: "Secure, production-grade real-time multiplayer UNO card game.",
+    url: "https://uno.ambady.space",
+    siteName: "UNO! Multiplayer",
+    images: [
+      {
+        url: "/uno-logo.svg",
+        width: 200,
+        height: 200,
+        alt: "UNO! Logo",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "UNO! Real-Time Multiplayer",
+    description: "Secure, production-grade real-time multiplayer UNO card game.",
+    images: ["/uno-logo.svg"],
+  },
 };
 
 export default function RootLayout({
