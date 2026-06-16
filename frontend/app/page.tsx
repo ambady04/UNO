@@ -185,7 +185,7 @@ function HomeContent() {
             />
           </div>
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? (redirectCode ? 'Joining Room...' : 'Registering...') : (redirectCode ? `Join Room ${redirectCode.toUpperCase()}` : 'Play as Guest')}
+            {loading ? (redirectCode ? 'Joining Room...' : 'Registering...') : (redirectCode ? `Join Room ${redirectCode.toUpperCase()}` : 'Enter')}
           </button>
         </form>
       ) : (

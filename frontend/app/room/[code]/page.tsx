@@ -10,6 +10,7 @@ import {
   joinRoom,
   RoomResponse
 } from '../../api';
+import { gameSounds } from '../../sounds';
 
 interface PlayerState {
   id: string;
@@ -64,6 +65,7 @@ export default function RoomPage() {
   const [pendingWildCard, setPendingWildCard] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Custom Confirmation Dialog State
   const [activeConfirm, setActiveConfirm] = useState<{
@@ -85,6 +87,78 @@ export default function RoomPage() {
 
   // Keep the ref in sync with the state
   useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
+
+  const prevGameStateRef = useRef<FilteredGameState | null>(null);
+
+  // Initialize mute state
+  useEffect(() => {
+    setIsMuted(gameSounds.getMute());
+  }, []);
+
+  // Play sound effects dynamically based on state transitions
+  useEffect(() => {
+    if (gameState && prevGameStateRef.current) {
+      const prev = prevGameStateRef.current;
+      const current = gameState;
+
+      // 1. Detect Game Start
+      if (prev.game_status === 'LOBBY' && current.game_status === 'PLAYING') {
+        gameSounds.play('gameStart');
+      }
+      // 2. Detect Game Over
+      else if (prev.game_status === 'PLAYING' && current.game_status === 'FINISHED') {
+        const myToken = guest?.token;
+        const isWinner = current.winner_id === myToken;
+        if (isWinner) {
+          gameSounds.play('gameWin');
+        } else {
+          gameSounds.play('gameOver');
+        }
+      }
+      // 3. Detect Action: Card Played or Drawn or Turn Change or UNO callout
+      else if (current.game_status === 'PLAYING') {
+        // Compare discard pile top card
+        const prevTop = prev.discard_pile?.[0];
+        const currTop = current.discard_pile?.[0];
+        if (currTop && currTop !== prevTop) {
+          gameSounds.play('playCard');
+        }
+        // Compare deck count or hand card count to detect Draw Card
+        // (Only play draw card sound if a card wasn't just played in the same update)
+        else if (current.deck_count !== prev.deck_count) {
+          gameSounds.play('drawCard');
+        }
+
+        // Compare turn changes (My Turn)
+        const prevTurn = prev.current_turn;
+        const currTurn = current.current_turn;
+        if (currTurn !== prevTurn) {
+          const myToken = guest?.token;
+          const activePlayer = current.players[currTurn];
+          if (activePlayer?.id === myToken) {
+            gameSounds.play('myTurn');
+          }
+        }
+
+        // Detect UNO declared
+        const prevMyPlayer = prev.players.find(p => p.id === guest?.token);
+        const currMyPlayer = current.players.find(p => p.id === guest?.token);
+        if (currMyPlayer?.called_uno && !prevMyPlayer?.called_uno) {
+          gameSounds.play('unoShout');
+        } else {
+          // Check if any other player declared UNO
+          for (const p of current.players) {
+            const prevP = prev.players.find(x => x.id === p.id);
+            if (p.called_uno && !prevP?.called_uno) {
+              gameSounds.play('unoShout');
+              break;
+            }
+          }
+        }
+      }
+    }
+    prevGameStateRef.current = gameState;
+  }, [gameState, guest]);
 
   // Trigger confetti explosion on finished
   useEffect(() => {
@@ -206,8 +280,11 @@ export default function RoomPage() {
         // Use a ref (not a functional updater) to read isChatOpen — avoids React StrictMode
         // calling the updater twice which would double the count.
         const myToken = typeof window !== 'undefined' ? localStorage.getItem('uno_guest_token') : null;
-        if (msg.sender_id !== myToken && !isChatOpenRef.current) {
-          setUnreadCount((n) => n + 1);
+        if (msg.sender_id !== myToken) {
+          gameSounds.play('chat');
+          if (!isChatOpenRef.current) {
+            setUnreadCount((n) => n + 1);
+          }
         }
       }
       else if (data.type === 'player_kicked') {
@@ -221,6 +298,7 @@ export default function RoomPage() {
           disconnectSocket();
           router.push('/');
         } else {
+          gameSounds.play('alert');
           showAlert("A player was kicked by the host.");
         }
       }
@@ -758,6 +836,27 @@ export default function RoomPage() {
             <button onClick={copyInviteLink} className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12, minHeight: 32 }}>
               Invite
             </button>
+            <button
+              onClick={() => {
+                const newMuted = !isMuted;
+                setIsMuted(newMuted);
+                gameSounds.setMute(newMuted);
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '6px 12px',
+                fontSize: 14,
+                minHeight: 32,
+                width: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title={isMuted ? 'Unmute game sounds' : 'Mute game sounds'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
             <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12, minHeight: 32, borderColor: 'rgba(255,51,51,0.3)', color: '#ff5555' }}>
               Exit
             </button>
@@ -872,12 +971,24 @@ export default function RoomPage() {
                 </p>
               )}
 
-              {/* Lobby Utility Action Row (Invite & Exit) */}
+              {/* Lobby Utility Action Row (Invite & Exit & Mute) */}
               <div style={{ display: 'flex', gap: 12, width: '100%' }}>
-                <button onClick={copyInviteLink} className="btn-secondary" style={{ flex: 1, minHeight: 44 }}>
+                <button onClick={copyInviteLink} className="btn-secondary" style={{ flex: 2, minHeight: 44 }}>
                   Invite
                 </button>
-                <button onClick={handleLeaveRoom} className="btn-secondary" style={{ flex: 1, minHeight: 44, borderColor: 'rgba(255,51,51,0.3)', color: '#ff5555' }}>
+                <button
+                  onClick={() => {
+                    const newMuted = !isMuted;
+                    setIsMuted(newMuted);
+                    gameSounds.setMute(newMuted);
+                  }}
+                  className="btn-secondary"
+                  style={{ flex: 1, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                  title={isMuted ? 'Unmute game sounds' : 'Mute game sounds'}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+                <button onClick={handleLeaveRoom} className="btn-secondary" style={{ flex: 2, minHeight: 44, borderColor: 'rgba(255,51,51,0.3)', color: '#ff5555' }}>
                   Exit
                 </button>
               </div>
