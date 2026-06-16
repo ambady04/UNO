@@ -67,6 +67,13 @@ export default function RoomPage() {
   const [loading, setLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [flyingCardData, setFlyingCardData] = useState<{
+    card: string;
+    cardIdx: number;  // index in the sorted hand — to hide exactly that slot
+    startX: number; startY: number;
+    endX: number; endY: number;
+    width: number; height: number;
+  } | null>(null);
 
   // Custom Confirmation Dialog State
   const [activeConfirm, setActiveConfirm] = useState<{
@@ -83,6 +90,7 @@ export default function RoomPage() {
   const reconnectAttemptsRef = useRef<number>(0);
   const isUnmountedRef = useRef<boolean>(false);
   const isChatOpenRef = useRef<boolean>(false); // mirrors isChatOpen to avoid side effects in state updaters
+  const discardPileRef = useRef<HTMLDivElement>(null); // anchor for flying card animation
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [confettiParticles, setConfettiParticles] = useState<{ id: number; dx: string; dy: string; color: string; rot: string; duration: string; left: string; top: string }[]>([]);
 
@@ -450,7 +458,7 @@ export default function RoomPage() {
     });
   }
 
-  function handlePlayCard(card: string) {
+  function handlePlayCard(card: string, cardIdx: number, cardEl?: HTMLElement) {
     if (!gameState) return;
 
     // Check if it's the player's turn
@@ -460,7 +468,7 @@ export default function RoomPage() {
       return;
     }
 
-    const [color, value] = card.split('_');
+    const [color] = card.split('_');
 
     // Check if wild card played
     if (color === 'W') {
@@ -468,8 +476,31 @@ export default function RoomPage() {
       return;
     }
 
-    // Play card immediately
-    sendSocketMessage('play_card', { card });
+    // If we can determine both positions, do the sliding animation overlay
+    if (cardEl && discardPileRef.current) {
+      // Use the inner .uno-card element's rect so we account for its own CSS transforms
+      // (e.g. translateY(-8px) on playable cards) for a pixel-perfect overlay start
+      const innerCard = (cardEl.firstElementChild as HTMLElement) ?? cardEl;
+      const cardRect = innerCard.getBoundingClientRect();
+      const discardRect = discardPileRef.current.getBoundingClientRect();
+      setFlyingCardData({
+        card,
+        cardIdx,
+        startX: cardRect.left,
+        startY: cardRect.top,
+        endX: discardRect.left + (discardRect.width  - cardRect.width)  / 2,
+        endY: discardRect.top  + (discardRect.height - cardRect.height) / 2,
+        width: cardRect.width,
+        height: cardRect.height,
+      });
+      // Send after animation finishes; clear overlay at same time
+      setTimeout(() => {
+        sendSocketMessage('play_card', { card });
+        setFlyingCardData(null);
+      }, 290);
+    } else {
+      sendSocketMessage('play_card', { card });
+    }
   }
 
   function submitWildCard(chosenColor: string) {
@@ -1295,8 +1326,10 @@ export default function RoomPage() {
 
               </div>
 
-              {/* Discard Pile Top Card */}
-              {gameState.discard_pile.length > 0 && renderUnoCard(gameState.discard_pile[0], undefined, { cursor: 'default', animation: 'card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }, gameState.discard_pile[0])}
+              {/* Discard Pile Top Card — ref used as target anchor for flying card animation */}
+              <div ref={discardPileRef} style={{ display: 'inline-flex' }}>
+                {gameState.discard_pile.length > 0 && renderUnoCard(gameState.discard_pile[0], undefined, { cursor: 'default', animation: 'card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }, gameState.discard_pile[0])}
+              </div>
             </div>
 
 
@@ -1509,20 +1542,36 @@ export default function RoomPage() {
               <div className="hand-container">
                 {sortHand(gameState.hand).map((card, idx) => {
                   const isCardPlayable = isMyTurn && checkPlayableClient(card);
+                  const isFlying = flyingCardData?.cardIdx === idx && flyingCardData?.card === card;
                   return (
                     <div
                       className="hand-card-wrapper"
                       key={idx}
-                      style={getCardStyle(idx, gameState.hand.length)}
+                      style={{
+                        ...getCardStyle(idx, gameState.hand.length),
+                        cursor: isCardPlayable ? 'pointer' : 'not-allowed',
+                        // Hide the exact slot that's currently animating to the pile
+                        // so there's no double-card flash during the slide
+                        visibility: isFlying ? 'hidden' : 'visible',
+                        pointerEvents: isFlying ? 'none' : 'auto',
+                      }}
+                      onClick={(e) => {
+                        if (isCardPlayable) {
+                          // Pass the wrapper element; handlePlayCard drills into firstElementChild
+                          // to get the inner card's rect (which reflects its CSS transforms)
+                          handlePlayCard(card, idx, e.currentTarget);
+                        }
+                      }}
                     >
                       {renderUnoCard(
                         card,
-                        () => handlePlayCard(card),
+                        undefined,
                         {
                           transform: isCardPlayable ? 'translateY(-8px)' : 'scale(0.95)',
                           opacity: 1,
                           filter: isCardPlayable ? 'none' : 'brightness(0.55) grayscale(0.25)',
-                          cursor: isCardPlayable ? 'pointer' : 'not-allowed'
+                          cursor: isCardPlayable ? 'pointer' : 'not-allowed',
+                          pointerEvents: 'none',
                         },
                         idx,
                         isCardPlayable,
@@ -1598,6 +1647,23 @@ export default function RoomPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Flying card overlay — slides from hand position to discard pile position */}
+      {flyingCardData && (
+        <div
+          className="card-slide-overlay"
+          style={{
+            left: flyingCardData.startX,
+            top: flyingCardData.startY,
+            width: flyingCardData.width,
+            height: flyingCardData.height,
+            '--slide-dx': `${flyingCardData.endX - flyingCardData.startX}px`,
+            '--slide-dy': `${flyingCardData.endY - flyingCardData.startY}px`,
+          } as React.CSSProperties}
+        >
+          {renderUnoCard(flyingCardData.card, undefined, { cursor: 'default', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }, 'flying', false, false)}
         </div>
       )}
 
