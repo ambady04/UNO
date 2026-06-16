@@ -633,7 +633,7 @@ export default function RoomPage() {
     // Dynamic overlaps based on total cards
     let overlapDesktop = -30;
     let overlapMobile = -20;
-    
+
     if (total > 15) {
       overlapDesktop = -54;
       overlapMobile = -32;
@@ -1130,11 +1130,26 @@ export default function RoomPage() {
                   position: 'relative'
                 }}
               >
-                <div className="card-center" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ color: '#ffcc00', fontSize: 12, fontWeight: 900, textShadow: '0 1px 2px #000' }}>
-                    {gameState.deck_count}
-                  </span>
+                {/* Glowing Deck Count Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: 8,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(255, 255, 255, 1)',
+                  border: '1.5px solid #ff0000',
+                  color: '#ff0000',
+                  borderRadius: '10px',
+                  padding: '2px 8px',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
+                  zIndex: 20,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {gameState.deck_count}
                 </div>
+
                 {(gameState.draw_penalty || 0) > 0 && (
                   <div style={{
                     position: 'absolute',
@@ -1151,7 +1166,7 @@ export default function RoomPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     boxShadow: '0 0 8px rgba(255, 51, 51, 0.8)',
-                    zIndex: 10,
+                    zIndex: 21,
                     animation: 'pulse 1.2s infinite'
                   }}>
                     +{gameState.draw_penalty}

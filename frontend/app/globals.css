@@ -376,25 +376,76 @@ body {
 
 /* Back of card */
 .card-back {
-  background: radial-gradient(circle, #cc1111 0%, #770000 100%) !important;
-  border-color: #ffffff !important;
+  background: radial-gradient(circle, #151515 0%, #000000 100%) !important; /* Premium rich black gradient */
+  border-color: rgba(255, 255, 255, 0.3) !important;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .card-back::before {
-  display: none !important;
+  content: '' !important;
+  display: block !important;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.4) !important;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .card-back::after {
-  content: 'UNO';
-  color: #ffcc00;
-  font-style: italic;
-  font-size: 16px;
-  font-weight: 900;
-  transform: rotate(-20deg);
-  text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+  content: 'UNO' !important;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  height: 50%;
+  background: #ffffff !important;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e52521 !important; /* Bold red UNO text */
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  font-style: italic !important;
+  letter-spacing: -0.5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  z-index: 2;
+}
+
+@media (max-width: 1199px) {
+  .card-back::before {
+    top: 3px;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    border-width: 1.5px !important;
+    border-radius: 5px;
+  }
+  .card-back::after {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 499px) {
+  .card-back::before {
+    top: 2.5px;
+    left: 2.5px;
+    right: 2.5px;
+    bottom: 2.5px;
+    border-width: 1.2px !important;
+    border-radius: 4.5px;
+  }
+  .card-back::after {
+    font-size: 14px !important;
+  }
 }
 
 /* Card layout segments */
