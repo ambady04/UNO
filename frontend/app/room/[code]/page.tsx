@@ -1561,22 +1561,23 @@ export default function RoomPage() {
                 {sortHand(gameState.hand).map((card, idx) => {
                   const isCardPlayable = isMyTurn && checkPlayableClient(card);
                   const isFlying = flyingCardData?.cardIdx === idx && flyingCardData?.card === card;
+                  const baseStyle = getCardStyle(idx, gameState.hand.length);
                   return (
                     <div
                       className="hand-card-wrapper"
                       key={idx}
                       style={{
-                        ...getCardStyle(idx, gameState.hand.length),
+                        ...baseStyle,
                         cursor: isCardPlayable ? 'pointer' : 'not-allowed',
-                        // Hide the exact slot that's currently animating to the pile
-                        // so there's no double-card flash during the slide
                         visibility: isFlying ? 'hidden' : 'visible',
                         pointerEvents: isFlying ? 'none' : 'auto',
+                        // Playable cards float above non-playable neighbours
+                        zIndex: isCardPlayable ? 1000 + idx : idx,
+                        transform: isCardPlayable ? 'translateY(-10px)' : 'translateY(4px)',
+                        transition: 'transform 0.2s ease',
                       }}
                       onClick={(e) => {
                         if (isCardPlayable) {
-                          // Pass the wrapper element; handlePlayCard drills into firstElementChild
-                          // to get the inner card's rect (which reflects its CSS transforms)
                           handlePlayCard(card, idx, e.currentTarget);
                         }
                       }}
@@ -1585,9 +1586,9 @@ export default function RoomPage() {
                         card,
                         undefined,
                         {
-                          transform: isCardPlayable ? 'translateY(-8px)' : 'scale(0.95)',
-                          opacity: 1,
-                          filter: isCardPlayable ? 'none' : 'brightness(0.55) grayscale(0.25)',
+                          transform: isCardPlayable ? 'translateY(-4px) scale(1.04)' : 'scale(0.93)',
+                          opacity: isCardPlayable ? 1 : 0.72,
+                          filter: isCardPlayable ? 'none' : 'brightness(0.5) grayscale(0.3)',
                           cursor: isCardPlayable ? 'pointer' : 'not-allowed',
                           pointerEvents: 'none',
                         },

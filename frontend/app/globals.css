@@ -297,7 +297,7 @@ body {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   z-index: 20;
   flex-shrink: 0;
   margin-top: auto !important;
@@ -396,14 +396,14 @@ body {
 
 /* Hover/Active states */
 .uno-card:hover {
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  z-index: 10;
+  transform: translateY(-6px) scale(1.04);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  z-index: 2000;
 }
 
 .uno-card:active {
-  transform: translateY(-10px) scale(1.05) !important;
-  z-index: 50;
+  transform: translateY(-12px) scale(1.07) !important;
+  z-index: 2500;
 }
 
 /* Card Colors */
@@ -758,15 +758,15 @@ body {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .hand-container {
   display: flex;
-  padding: 24px 24px 6px 24px; /* Added top padding buffer to prevent vertical card selection clipping */
-  height: 165px; /* Fixed height accommodating translations */
+  padding: 36px 24px 6px 24px; /* Added more top padding buffer to prevent vertical card selection clipping */
+  height: 177px; /* Increased height accommodating translations */
   overflow-x: auto;
-  overflow-y: hidden; /* Prevent vertical scrolling, allow horizontal */
+  overflow-y: visible; /* Try visible, browser falls back but large padding handles it */
   -webkit-overflow-scrolling: touch;
   gap: 0px;
   scrollbar-width: none;
@@ -786,14 +786,15 @@ body {
 
 .hand-card-wrapper {
   margin-right: var(--card-overlap, -36px);
-  transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), margin-right 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), margin-right 0.25s cubic-bezier(0.25, 1, 0.5, 1) !important;
   flex-shrink: 0;
   animation: card-draw 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .hand-card-wrapper:hover {
-  transform: translateY(-16px) !important;
-  z-index: 100 !important;
+  /* Sit on top of everything — playable cards sit at 1000+idx, hover beats all */
+  z-index: 2000 !important;
+  transform: translateY(-18px) !important;
 }
 
 @media (max-width: 499px) {
@@ -801,7 +802,7 @@ body {
     margin-right: var(--card-overlap-mobile, -24px);
   }
   .hand-card-wrapper:hover {
-    transform: translateY(-10px) !important;
+    transform: translateY(-12px) !important;
   }
 }
 
