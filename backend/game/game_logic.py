@@ -153,37 +153,21 @@ def initialize_game(players):
     for pid in hands:
         draw_cards_for_player(state, pid, 7)
         
-    # Draw starting card to discard pile (must be colored, non-wild)
+    # Draw starting card — must be a plain number card (no action, no wild)
+    ACTION_VALUES = {'Skip', 'Reverse', 'Draw2', 'Wild', 'WildDraw4'}
     while True:
         start_card = state['deck'].pop()
         card_color, card_value = parse_card(start_card)
-        if card_color != 'W':
+        if card_color != 'W' and card_value not in ACTION_VALUES:
             state['discard_pile'].append(start_card)
             state['current_color'] = card_color
             state['current_value'] = card_value
             break
         else:
-            # Put back wild card and reshuffle
+            # Put back and reshuffle so we get a fair random result
             state['deck'].append(start_card)
             random.shuffle(state['deck'])
             
-    # Handle starting card actions
-    # Skip
-    if card_value == 'Skip':
-        advance_turn(state, step=1)
-    # Reverse
-    elif card_value == 'Reverse':
-        if len(state['players']) == 2:
-            # In 2-player game, reverse acts as a Skip
-            advance_turn(state, step=1)
-        else:
-            state['direction'] = -1
-            # Current turn remains index 0, but play moves counter-clockwise.
-            # No skip needed, index 0 plays first.
-    # Draw 2
-    elif card_value == 'Draw2':
-        state['draw_penalty'] = 2
-        
     check_deck_integrity(state)
     return state
 

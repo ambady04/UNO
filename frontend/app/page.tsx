@@ -238,7 +238,20 @@ function HomeContent() {
                 maxLength={6}
                 required
               />
-              <button type="submit" className="btn-secondary" disabled={loading}>
+              <button
+                type="submit"
+                className="btn-secondary"
+                disabled={loading}
+                style={roomCode.length === 6 ? {
+                  background: 'rgba(0, 204, 102, 0.18)',
+                  borderColor: '#00cc66',
+                  color: '#00ee77',
+                  boxShadow: '0 0 14px rgba(0, 204, 102, 0.25)',
+                  transition: 'background 0.3s, border-color 0.3s, box-shadow 0.3s, color 0.3s',
+                } : {
+                  transition: 'background 0.3s, border-color 0.3s, box-shadow 0.3s, color 0.3s',
+                }}
+              >
                 Join Room
               </button>
             </form>
