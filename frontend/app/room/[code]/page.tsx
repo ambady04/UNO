@@ -867,7 +867,11 @@ export default function RoomPage() {
 
         {p.card_count > 0 && (
           <span className="compact-opponent-badge">
-            🎴{p.card_count}
+            <svg viewBox="0 0 24 24" style={{ width: '11px', height: '14px', fill: 'currentColor', stroke: 'none', marginRight: '3px', display: 'inline-block', verticalAlign: 'middle' }}>
+              <rect x="3" y="5" width="14" height="17" rx="2.5" opacity="0.4" />
+              <rect x="7" y="2" width="14" height="17" rx="2.5" />
+            </svg>
+            <span style={{ verticalAlign: 'middle' }}>{p.card_count}</span>
           </span>
         )}
 
