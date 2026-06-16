@@ -91,11 +91,29 @@ export default function RoomPage() {
   const isUnmountedRef = useRef<boolean>(false);
   const isChatOpenRef = useRef<boolean>(false); // mirrors isChatOpen to avoid side effects in state updaters
   const discardPileRef = useRef<HTMLDivElement>(null); // anchor for flying card animation
+  const overlayRef    = useRef<HTMLDivElement>(null); // flying card overlay element
   const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [confettiParticles, setConfettiParticles] = useState<{ id: number; dx: string; dy: string; color: string; rot: string; duration: string; left: string; top: string }[]>([]);
 
   // Keep the ref in sync with the state
   useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
+
+  // Drive the flying card animation via WAAPI so it runs on the GPU compositor
+  // (CSS vars inside transform prevent compositor offloading — WAAPI uses concrete values)
+  useEffect(() => {
+    if (!flyingCardData || !overlayRef.current) return;
+    const { startX, startY, endX, endY } = flyingCardData;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    overlayRef.current.animate(
+      [
+        { transform: 'translate(0px, 0px) scale(1) rotate(0deg)',                                           opacity: 1 },
+        { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - 28}px) scale(1.09) rotate(-5deg)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.92) rotate(3deg)`,                               opacity: 0 },
+      ],
+      { duration: 310, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)', fill: 'forwards' }
+    );
+  }, [flyingCardData]);
 
   // Listen for mobile viewport sizes
   useEffect(() => {
@@ -1653,15 +1671,14 @@ export default function RoomPage() {
       {/* Flying card overlay — slides from hand position to discard pile position */}
       {flyingCardData && (
         <div
+          ref={overlayRef}
           className="card-slide-overlay"
           style={{
             left: flyingCardData.startX,
             top: flyingCardData.startY,
             width: flyingCardData.width,
             height: flyingCardData.height,
-            '--slide-dx': `${flyingCardData.endX - flyingCardData.startX}px`,
-            '--slide-dy': `${flyingCardData.endY - flyingCardData.startY}px`,
-          } as React.CSSProperties}
+          }}
         >
           {renderUnoCard(flyingCardData.card, undefined, { cursor: 'default', boxShadow: '0 16px 40px rgba(0,0,0,0.6)' }, 'flying', false, false)}
         </div>

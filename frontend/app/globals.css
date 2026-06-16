@@ -1081,39 +1081,17 @@ body {
   }
 }
 
-/* Card slide-to-pile: fixed-position clone slides from hand coords to discard pile coords */
-@keyframes card-slide-to-pile {
-  0% {
-    transform: translate(0, 0) scale(1) rotate(0deg);
-    opacity: 1;
-  }
-  45% {
-    /* Arc slightly above the direct line for a natural toss feel */
-    transform: translate(
-      calc(var(--slide-dx) * 0.45),
-      calc(var(--slide-dy) * 0.45 - 28px)
-    ) scale(1.09) rotate(-5deg);
-    opacity: 1;
-  }
-  80% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(var(--slide-dx), var(--slide-dy)) scale(0.92) rotate(3deg);
-    opacity: 0;
-  }
-}
-
+/* .card-slide-overlay — animation driven by WAAPI in useEffect (concrete px values, GPU composited) */
 .card-slide-overlay {
   position: fixed;
   pointer-events: none;
   z-index: 9500;
-  /* Promote to GPU compositing layer for flicker-free animation */
+  /* GPU compositing layer hints */
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   transform-origin: center center;
-  animation: card-slide-to-pile 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  /* No CSS animation here — WAAPI handles it with concrete pixel values */
 }
 
 @keyframes alert-life {
