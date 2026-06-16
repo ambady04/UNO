@@ -1383,6 +1383,7 @@ export default function RoomPage() {
                 <button
                   onClick={handleReportNoUno}
                   style={{
+                    height: '44px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
@@ -1515,8 +1516,8 @@ export default function RoomPage() {
                       style={getCardStyle(idx, gameState.hand.length)}
                     >
                       {renderUnoCard(
-                        card, 
-                        () => handlePlayCard(card), 
+                        card,
+                        () => handlePlayCard(card),
                         {
                           transform: isCardPlayable ? 'translateY(-8px)' : 'scale(0.95)',
                           opacity: 1,
