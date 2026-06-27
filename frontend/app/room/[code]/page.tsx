@@ -12,6 +12,17 @@ import {
 } from "../../api";
 import { gameSounds } from "../../sounds";
 
+const QUICK_CHAT_OPTIONS = [
+  { label: "😫", sound: "faaah" },
+  { label: "💥", sound: "vine-boom" },
+  { label: "💨", sound: "dry-fart" },
+  { label: "😲", sound: "anime-wow-sound-effect" },
+  { label: "🐔", sound: "chicken-on-tree-screaming" },
+  { label: "👽", sound: "among-us-role-reveal-sound" },
+  { label: "😂", sound: "ace-laff" },
+  { label: "😭", sound: "cry_male_01" },
+];
+
 interface PlayerState {
   id: string;
   name: string;
@@ -411,7 +422,17 @@ export default function RoomPage() {
             ? localStorage.getItem("uno_guest_token")
             : null;
         if (msg.sender_id !== myToken) {
-          gameSounds.play("chat");
+          if (msg.message.startsWith("🔊 ")) {
+            const soundKey = msg.message.slice(2);
+            const option = QUICK_CHAT_OPTIONS.find((opt) => opt.label === soundKey);
+            if (option && !gameSounds.getMute()) {
+              const audio = new Audio(`https://www.myinstants.com/media/sounds/${option.sound}.mp3`);
+              audio.volume = 0.6;
+              audio.play().catch((err) => console.error("Failed to play quick chat sound", err));
+            }
+          } else {
+            gameSounds.play("chat");
+          }
           if (!isChatOpenRef.current) {
             setUnreadCount((n) => n + 1);
             const id = Math.random().toString(36).substr(2, 9) + Date.now().toString();
@@ -705,6 +726,15 @@ export default function RoomPage() {
     if (!chatInput.trim()) return;
     sendSocketMessage("send_message", { message: chatInput.trim() });
     setChatInput("");
+  }
+
+  function sendQuickChat(label: string, soundFile: string) {
+    sendSocketMessage("send_message", { message: `🔊 ${label}` });
+    if (!gameSounds.getMute()) {
+      const audio = new Audio(`https://www.myinstants.com/media/sounds/${soundFile}.mp3`);
+      audio.volume = 0.6;
+      audio.play().catch((err) => console.error("Failed to play local quick chat sound", err));
+    }
   }
 
   function copyInviteLink() {
@@ -1988,7 +2018,7 @@ export default function RoomPage() {
                           fontWeight: 400,
                         }}
                       >
-                        {preview.message}
+                        {preview.message.startsWith("🔊 ") ? preview.message.slice(2) : preview.message}
                       </div>
                       {/* Small arrow down pointing to chat icon - only on the bottom-most preview */}
                       {index === activePreviews.length - 1 && (
@@ -2320,10 +2350,74 @@ export default function RoomPage() {
                 >
                   {msg.sender_name}
                 </div>
-                <div>{msg.message}</div>
+                <div>{msg.message.startsWith("🔊 ") ? msg.message.slice(2) : msg.message}</div>
               </div>
             ))
           )}
+        </div>
+
+        {/* Quick Reactions */}
+        <div
+          style={{
+            padding: "8px 16px 12px 16px",
+            borderTop: "1px solid var(--border-glass)",
+            background: "rgba(255, 255, 255, 0.02)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              opacity: 0.5,
+              textTransform: "uppercase",
+              letterSpacing: 0.8,
+              marginBottom: 8,
+            }}
+          >
+            ⚡ Quick Reactions
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 6,
+            }}
+          >
+            {QUICK_CHAT_OPTIONS.map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => sendQuickChat(opt.label, opt.sound)}
+                style={{
+                  padding: "6px 8px",
+                  fontSize: 16,
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.2s, transform 0.1s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.96)";
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Input */}
