@@ -744,7 +744,14 @@ export default function BotGamePage() {
         }
 
         botTurnInProgressRef.current = false;
-        setGs(nextState);
+        // Use functional update to preserve playerCalledUno if the player pressed
+        // UNO while the bot was "thinking" (stale closure would overwrite it).
+        setGs((prev) => ({
+          ...nextState,
+          playerCalledUno: prev?.playerCalledUno
+            ? prev.playerCalledUno
+            : nextState.playerCalledUno,
+        }));
         if (msg) showMsg(msg);
       }, delay);
     },
