@@ -709,15 +709,24 @@ export default function RoomPage() {
 
   function copyInviteLink() {
     if (typeof window !== "undefined") {
-      const plainText = `🎮 *UNO! Game Invitation* 🃏\n━━━━━━━━━━━━━━━━━━━━━━\nJoin my room and let's play UNO!\n\n🔑 Room Code: ${roomCode}\n🔗 Link to join:\n${window.location.href}\n\nSee you in the game! 🚀`;
+      const plainText = `You've been invited to join an UNO game session — and trust me, you don't want to miss this one.\n\nRoom Code: ${roomCode}\nJoin here: ${window.location.href}\n\nGrab your seat before someone else takes it. See you at the table! 🎴`;
 
       const htmlText =
-        `<div style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; max-width: 400px; padding: 12px; border: 1px solid #eaeaea; border-radius: 8px; background-color: #fafafa; color: #333;">` +
-        `<h3 style="margin-top: 0; margin-bottom: 8px; color: #000; font-size: 16px; display: flex; align-items: center; gap: 6px;">🎮 UNO! Game Invitation 🃏</h3>` +
-        `<div style="font-size: 14px; margin-bottom: 12px; color: #555;">Join my room and let's play UNO!</div>` +
-        `<div style="font-size: 14px; margin-bottom: 8px;">🔑 <strong>Room Code:</strong> <code style="background: #eef2f6; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: bold; color: #000;">${roomCode}</code></div>` +
-        `<div style="font-size: 14px; margin-bottom: 12px;">🔗 <strong>Link to join:</strong> <a href="${window.location.href}" style="color: #0066cc; text-decoration: underline;">${window.location.href}</a></div>` +
-        `<div style="font-size: 13px; font-style: italic; color: #888; margin-bottom: 0;">See you in the game! 🚀</div>` +
+        `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 380px; border-radius: 12px; background-color: #1e293b; color: #ffffff; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border: 1px solid #334155; text-align: left; margin: 10px auto;">` +
+        `<div style="font-size: 14px; margin-bottom: 20px; color: #cbd5e1; line-height: 1.5; font-weight: 500;">` +
+        `You've been invited to join an UNO game session — and trust me, you don't want to miss this one.` +
+        `</div>` +
+        `<div style="background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">` +
+        `<div style="font-size: 14px; margin-bottom: 6px; color: #cbd5e1;">` +
+        `<strong>Room Code:</strong> <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; color: #38bdf8; font-weight: 700; font-size: 15px; letter-spacing: 0.5px;">${roomCode}</code>` +
+        `</div>` +
+        `<div style="font-size: 14px; color: #cbd5e1;">` +
+        `<strong>Join here:</strong> <a href="${window.location.href}" style="color: #38bdf8; text-decoration: underline; font-weight: 600;">${window.location.href}</a>` +
+        `</div>` +
+        `</div>` +
+        `<div style="font-size: 13px; color: #94a3b8; line-height: 1.4; font-style: italic;">` +
+        `Grab your seat before someone else takes it. See you at the table! 🎴` +
+        `</div>` +
         `</div>`;
 
       if (navigator.clipboard && typeof ClipboardItem !== "undefined") {
