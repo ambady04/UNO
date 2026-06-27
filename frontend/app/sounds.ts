@@ -187,7 +187,7 @@ class SoundManager {
         break;
       }
       case 'gameStart': {
-        // Rustling shuffling cards: 7 clicks in rapid sequence
+        // Rustling shuffling cards: 7 card deal thwips in rapid sequence
         for (let i = 0; i < 7; i++) {
           const clickTime = now + i * 0.1;
           const osc = this.ctx.createOscillator();
@@ -196,14 +196,14 @@ class SoundManager {
           clickGain.connect(this.ctx.destination);
 
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(150 + Math.random() * 100, clickTime);
-          osc.frequency.exponentialRampToValueAtTime(40, clickTime + 0.05);
+          osc.frequency.setValueAtTime(480 + Math.random() * 100, clickTime);
+          osc.frequency.exponentialRampToValueAtTime(150, clickTime + 0.08);
 
-          clickGain.gain.setValueAtTime(0.1, clickTime);
-          clickGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.05);
+          clickGain.gain.setValueAtTime(0.18, clickTime);
+          clickGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.08);
 
           osc.start(clickTime);
-          osc.stop(clickTime + 0.05);
+          osc.stop(clickTime + 0.08);
         }
         // Slap/thump of card stack
         const thumpTime = now + 0.75;

@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getStoredGuest } from "../api";
 import { gameSounds } from "../sounds";
@@ -222,20 +222,12 @@ function applyBotPlayPure(
 }
 
 // ─── Display helpers ────────────────────────────────────────────────────────
-// Solid gradients matching globals.css card colors exactly
-const CARD_BG: Record<string, string> = {
-  R: "linear-gradient(135deg, #ff4136 0%, #c3130a 100%)",
-  Y: "linear-gradient(135deg, #ffe500 0%, #ff9900 100%)",
-  G: "linear-gradient(135deg, #2ecc40 0%, #1b7a26 100%)",
-  B: "linear-gradient(135deg, #0074d9 0%, #005299 100%)",
-  W: "linear-gradient(135deg, #2a2b35 0%, #0e0f12 100%)",
-};
 const COLOR_MAP: Record<string, string> = {
-  R: "#e52521",
-  Y: "#ffe500",
-  G: "#2ba84a",
-  B: "#0076a3",
-  W: "#1e1f26",
+  R: "var(--color-red)",
+  Y: "var(--color-yellow)",
+  G: "var(--color-green)",
+  B: "var(--color-blue)",
+  W: "var(--color-wild)",
 };
 const COLOR_LABEL: Record<string, string> = {
   R: "Red",
@@ -243,6 +235,147 @@ const COLOR_LABEL: Record<string, string> = {
   G: "Green",
   B: "Blue",
 };
+
+const getCardStyle = (index: number, total: number) => {
+  // Dynamic overlaps based on total cards
+  let overlapDesktop = -30;
+  let overlapMobile = -20;
+
+  if (total > 15) {
+    overlapDesktop = -54;
+    overlapMobile = -32;
+  } else if (total > 10) {
+    overlapDesktop = -45;
+    overlapMobile = -28;
+  } else if (total > 6) {
+    overlapDesktop = -36;
+    overlapMobile = -24;
+  }
+
+  return {
+    zIndex: index,
+    position: "relative" as const,
+    "--card-overlap": `${overlapDesktop}px`,
+    "--card-overlap-mobile": `${overlapMobile}px`,
+    marginRight: index === total - 1 ? "0px" : undefined,
+  } as React.CSSProperties;
+};
+
+const renderReverseIcon = (size: string = "100%") => (
+  <svg
+    viewBox="0 0 100 100"
+    style={{
+      width: size,
+      height: size,
+      fill: "currentColor",
+      display: "block",
+    }}
+  >
+    <path d="M 25,60 C 20,40 40,20 60,25 L 56,15 L 78,30 L 60,45 L 60,35 C 47,32 32,44 35,58 Z" />
+    <path d="M 75,40 C 80,60 60,80 40,75 L 44,85 L 22,70 L 40,55 L 40,65 C 53,68 68,56 65,42 Z" />
+  </svg>
+);
+
+function renderUnoCard(
+  cardStr: string,
+  onClick?: () => void,
+  extraStyle?: React.CSSProperties,
+  keyProp?: any,
+  isPlayable?: boolean,
+  isSelected?: boolean,
+) {
+  const parts = cardStr.split("_");
+  const color = parts[0];
+  const val = parts[1] || "";
+
+  let colorClass = "card-back";
+  if (color === "R") colorClass = "card-red";
+  else if (color === "Y") colorClass = "card-yellow";
+  else if (color === "G") colorClass = "card-green";
+  else if (color === "B") colorClass = "card-blue";
+  else if (color === "W") colorClass = "card-wild";
+
+  const cardClasses = `uno-card ${colorClass} ${isPlayable ? "playable" : ""} ${isSelected ? "selected-card" : ""}`;
+
+  if (colorClass === "card-back") {
+    return (
+      <div
+        key={keyProp}
+        className={cardClasses}
+        onClick={onClick}
+        style={extraStyle}
+      />
+    );
+  }
+
+  let cornerLabel: React.ReactNode = val;
+  if (val === "Draw2") cornerLabel = "+2";
+  else if (val === "WildDraw4") cornerLabel = "+4";
+  else if (val === "Wild") cornerLabel = "W";
+  else if (val === "Skip") cornerLabel = "⊘";
+  else if (val === "Reverse") {
+    cornerLabel = (
+      <div
+        style={{
+          width: "12px",
+          height: "12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {renderReverseIcon("100%")}
+      </div>
+    );
+  }
+
+  const isWild = color === "W";
+  const isAction = ["Skip", "Reverse", "Draw2"].includes(val);
+  const isNumber = !isWild && !isAction;
+
+  return (
+    <div
+      key={keyProp}
+      className={cardClasses}
+      onClick={onClick}
+      style={extraStyle}
+    >
+      <div className="card-corner top-left">{cornerLabel}</div>
+      <div className="card-center">
+        {isWild ? (
+          <div className="card-center-wild-pill">
+            <span>{val === "WildDraw4" ? "+4" : "W"}</span>
+          </div>
+        ) : isNumber ? (
+          <div className="card-center-solid-circle">
+            <span>{val}</span>
+          </div>
+        ) : val === "Reverse" ? (
+          <div
+            className="card-center-oval"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+            }}
+          >
+            <div
+              style={{ width: "36px", height: "36px", color: "currentColor" }}
+            >
+              {renderReverseIcon("100%")}
+            </div>
+          </div>
+        ) : (
+          <div className="card-center-oval">
+            <span className="card-center-value">{cornerLabel}</span>
+          </div>
+        )}
+      </div>
+      <div className="card-corner bottom-right">{cornerLabel}</div>
+    </div>
+  );
+}
 
 function sortHand(hand: Card[]): Card[] {
   const co: Record<string, number> = { R: 0, Y: 1, G: 2, B: 3, W: 4 };
@@ -288,6 +421,20 @@ export default function BotGamePage() {
   const [pendingWild, setPendingWild] = useState<Card | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [botThinking, setBotThinking] = useState(false);
+  const [confettiParticles, setConfettiParticles] = useState<
+    {
+      id: number;
+      dx: string;
+      dy: string;
+      color: string;
+      rot: string;
+      duration: string;
+      left: string;
+      top: string;
+    }[]
+  >([]);
+
+  const prevGsRef = useRef<BotGameState | null>(null);
 
   // No ref needed — setTimeout id is local; won't trigger "ref during render" lint
   const showMsg = useCallback((text: string) => {
@@ -295,16 +442,198 @@ export default function BotGamePage() {
     setTimeout(() => setMessage((prev) => (prev === text ? "" : prev)), 3000);
   }, []);
 
+  // Play sound effects dynamically based on state transitions
+  useEffect(() => {
+    if (gs && prevGsRef.current) {
+      const prev = prevGsRef.current;
+      const current = gs;
+
+      if (prev.gameStatus !== "FINISHED" && current.gameStatus === "FINISHED") {
+        if (current.winner === "player") {
+          gameSounds.play("gameWin");
+        } else {
+          gameSounds.play("gameOver");
+        }
+      } else if (current.gameStatus === "PLAYING") {
+        // Top card compare
+        const prevTop = prev.discardPile[prev.discardPile.length - 1];
+        const currTop = current.discardPile[current.discardPile.length - 1];
+        if (currTop && currTop !== prevTop) {
+          const parts = currTop.split("_");
+          const color = parts[0];
+          const val = parts[1];
+          if (val === "WildDraw4") {
+            gameSounds.play("playPlus4");
+          } else if (val === "Draw2") {
+            gameSounds.play("playPlus2");
+          } else if (color === "W" && val === "Wild") {
+            gameSounds.play("playWild");
+          } else {
+            gameSounds.play("playCard");
+          }
+        } else if (current.deck.length !== prev.deck.length) {
+          gameSounds.play("drawCard");
+        }
+
+        if (current.currentTurn === "player" && prev.currentTurn !== "player") {
+          gameSounds.play("myTurn");
+        }
+
+        if (current.playerCalledUno && !prev.playerCalledUno) {
+          gameSounds.play("unoShout");
+        } else if (current.botCalledUno && !prev.botCalledUno) {
+          gameSounds.play("unoShout");
+        }
+      }
+    } else if (gs && !prevGsRef.current) {
+      gameSounds.play("gameStart");
+    }
+    prevGsRef.current = gs;
+  }, [gs]);
+
+  // Trigger confetti explosion on finished
+  useEffect(() => {
+    if (gs?.gameStatus === "FINISHED" && gs?.winner === "player") {
+      const colors = [
+        "#ff3333",
+        "#ffcc00",
+        "#00cc66",
+        "#3388ff",
+        "#ff00ff",
+        "#00ffff",
+      ];
+      const particles = Array.from({ length: 150 }).map((_, i) => {
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * 350 + 150;
+        const dx = `${Math.cos(angle) * distance}px`;
+        const dy = `${Math.sin(angle) * distance}px`;
+        const left = `calc(50% + ${Math.random() * 40 - 20}px)`;
+        const top = `calc(50% + ${Math.random() * 40 - 20}px)`;
+        return {
+          id: i,
+          dx,
+          dy,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: `${Math.random() * 360}deg`,
+          duration: `${Math.random() * 1.5 + 1.2}s`,
+          left,
+          top,
+        };
+      });
+      setConfettiParticles(particles);
+    } else {
+      setConfettiParticles([]);
+    }
+  }, [gs?.gameStatus, gs?.winner]);
+
+  // Auto-pass turn if the player draws a card and still has no playable cards
+  useEffect(() => {
+    if (!gs || gs.gameStatus !== "PLAYING" || gs.currentTurn !== "player") return;
+
+    if (gs.hasDrawnThisTurn && gs.drawPenalty === 0) {
+      const hasPlayableCard = gs.playerHand.some((c) =>
+        isPlayable(
+          c,
+          gs.currentColor,
+          gs.currentValue,
+          gs.drawPenalty,
+          gs.hasDrawnThisTurn,
+        )
+      );
+      if (!hasPlayableCard) {
+        showMsg("No playable card in hand. Passing turn...");
+        const timer = setTimeout(() => {
+          playerPassTurn();
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [
+    gs?.hasDrawnThisTurn,
+    gs?.drawPenalty,
+    gs?.playerHand,
+    gs?.currentColor,
+    gs?.currentValue,
+    gs?.currentTurn,
+    gs?.gameStatus,
+    showMsg,
+  ]);
+
+  // Bot catches player not calling UNO after 3 seconds
+  useEffect(() => {
+    if (!gs || gs.gameStatus !== "PLAYING") return;
+
+    if (gs.playerHand.length === 1 && !gs.playerCalledUno) {
+      const timer = setTimeout(() => {
+        setGs((current) => {
+          if (
+            !current ||
+            current.gameStatus !== "PLAYING" ||
+            current.playerHand.length !== 1 ||
+            current.playerCalledUno
+          ) {
+            return current;
+          }
+          const { drawn, deck, discard } = drawCards(
+            current.deck,
+            current.discardPile,
+            2,
+          );
+          showMsg("🤖 Bot caught you not calling UNO! Draw 2 cards.");
+          gameSounds.play("reportNoUno");
+
+          return {
+            ...current,
+            playerHand: [...current.playerHand, ...drawn],
+            deck,
+            discardPile: discard,
+            playerCalledUno: true, // Mark as called to prevent repeat penalty
+          };
+        });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [gs?.playerHand?.length, gs?.playerCalledUno, gs?.gameStatus, showMsg]);
+
+  function handleExit() {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("uno_bot_game_state");
+    }
+    router.push("/");
+  }
+
   useEffect(() => {
     // Defer state updates so they don't run synchronously inside the effect body
     const stored = getStoredGuest();
     const muted = gameSounds.getMute();
+    const saved = typeof window !== "undefined" ? localStorage.getItem("uno_bot_game_state") : null;
     const id = setTimeout(() => {
       if (stored) setNickname(stored.nickname);
       setIsMuted(muted);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.gameStatus === "PLAYING") {
+            setGs(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved bot game state", e);
+        }
+      }
     }, 0);
     return () => clearTimeout(id);
   }, []);
+
+  // Save game state changes to localStorage
+  useEffect(() => {
+    if (gs) {
+      if (gs.gameStatus === "PLAYING") {
+        localStorage.setItem("uno_bot_game_state", JSON.stringify(gs));
+      } else {
+        localStorage.removeItem("uno_bot_game_state");
+      }
+    }
+  }, [gs]);
 
   function startGame() {
     setGs(initGame());
@@ -339,35 +668,50 @@ export default function BotGamePage() {
         let msg: string;
 
         if (!pick) {
-          const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, 1);
-          const afterDraw = {
-            ...s,
-            botHand: [...s.botHand, ...drawn],
-            deck,
-            discardPile: discard,
-            hasDrawnThisTurn: true,
-            botCalledUno: false,
-          };
-          const pick2 = botPickCard(
-            afterDraw.botHand,
-            afterDraw.currentColor,
-            afterDraw.currentValue,
-            afterDraw.drawPenalty,
-            afterDraw.hasDrawnThisTurn,
-          );
-          if (!pick2) {
+          if (s.drawPenalty > 0) {
+            const count = s.drawPenalty;
+            const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, count);
             nextState = {
-              ...afterDraw,
+              ...s,
+              botHand: [...s.botHand, ...drawn],
+              deck,
+              discardPile: discard,
+              drawPenalty: 0,
               hasDrawnThisTurn: false,
               currentTurn: "player",
             };
-            msg = "Bot drew a card and passed.";
+            msg = `Bot drew ${count} card(s) and passed.`;
           } else {
-            [nextState, msg] = applyBotPlayPure(
-              afterDraw,
-              pick2.card,
-              pick2.chosenColor,
+            const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, 1);
+            const afterDraw = {
+              ...s,
+              botHand: [...s.botHand, ...drawn],
+              deck,
+              discardPile: discard,
+              hasDrawnThisTurn: true,
+              botCalledUno: false,
+            };
+            const pick2 = botPickCard(
+              afterDraw.botHand,
+              afterDraw.currentColor,
+              afterDraw.currentValue,
+              afterDraw.drawPenalty,
+              afterDraw.hasDrawnThisTurn,
             );
+            if (!pick2) {
+              nextState = {
+                ...afterDraw,
+                hasDrawnThisTurn: false,
+                currentTurn: "player",
+              };
+              msg = "Bot drew a card and passed.";
+            } else {
+              [nextState, msg] = applyBotPlayPure(
+                afterDraw,
+                pick2.card,
+                pick2.chosenColor,
+              );
+            }
           }
         } else {
           [nextState, msg] = applyBotPlayPure(s, pick.card, pick.chosenColor);
@@ -447,18 +791,19 @@ export default function BotGamePage() {
       next = { ...base, currentTurn: "player" };
       msg = "You played Reverse — acts as Skip in 1v1!";
     } else if (cv === "Draw2") {
-      next = { ...base, drawPenalty: 2, currentTurn: "bot" };
-      msg = `+2! Bot must draw 2 card(s).`;
+      const penalty = gs.drawPenalty + 2;
+      next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
+      msg = `+2! Bot must draw ${penalty} card(s).`;
     } else if (cv === "WildDraw4") {
-      next = { ...base, drawPenalty: 4, currentTurn: "bot" };
-      msg = `+4! Color → ${COLOR_LABEL[color]}. Bot draws 4.`;
+      const penalty = gs.drawPenalty + 4;
+      next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
+      msg = `+4! Color → ${COLOR_LABEL[color]}. Bot must draw ${penalty} card(s).`;
     } else {
       next = { ...base, currentTurn: "bot" };
     }
 
     setGs(next);
     if (msg) showMsg(msg);
-    gameSounds.play("playCard");
   }
 
   function playerDrawCard() {
@@ -481,7 +826,6 @@ export default function BotGamePage() {
       playerCalledUno: false,
       currentTurn: penaltyDone ? "bot" : gs.currentTurn,
     });
-    gameSounds.play("drawCard");
   }
 
   function playerPassTurn() {
@@ -501,59 +845,6 @@ export default function BotGamePage() {
     }
     setGs({ ...gs, playerCalledUno: true });
     showMsg("🎉 UNO!");
-    gameSounds.play("unoShout");
-  }
-
-  // ─── Render card ────────────────────────────────────────────────────────────
-  function renderCard(
-    card: Card,
-    onClick?: () => void,
-    playable = false,
-    faceDown = false,
-    key?: any,
-  ) {
-    const [cc] = card.split("_");
-    const bg = faceDown
-      ? "radial-gradient(circle, #e52521 0%, #990000 100%)"
-      : (CARD_BG[cc] ?? "linear-gradient(135deg, #333 0%, #111 100%)");
-    return (
-      <div
-        key={key}
-        onClick={onClick}
-        style={{
-          width: 66,
-          height: 99,
-          borderRadius: 8,
-          border: `2px solid rgba(255,255,255,${playable ? 0.9 : 0.2})`,
-          background: bg,
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 900,
-          fontSize: faceDown ? 11 : 18,
-          cursor: onClick ? "pointer" : "default",
-          boxShadow: playable
-            ? "0 0 10px rgba(255,255,255,0.4),0 4px 12px rgba(0,0,0,0.4)"
-            : "0 4px 12px rgba(0,0,0,0.4)",
-          transition: "transform 0.2s",
-          userSelect: "none",
-          flexShrink: 0,
-          opacity: 1,
-          fontStyle: faceDown ? "italic" : undefined,
-        }}
-        onMouseEnter={(e) => {
-          if (onClick)
-            (e.currentTarget as HTMLElement).style.transform =
-              "translateY(-8px) scale(1.05)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.transform = "";
-        }}
-      >
-        {faceDown ? "UNO" : cardLabel(card)}
-      </div>
-    );
   }
 
   // ─── Pre-game ───────────────────────────────────────────────────────────────
@@ -589,7 +880,7 @@ export default function BotGamePage() {
           >
             Start Game
           </button>
-          <button onClick={() => router.push("/")} className="btn-secondary">
+          <button onClick={handleExit} className="btn-secondary">
             ← Back to Lobby
           </button>
         </div>
@@ -601,19 +892,52 @@ export default function BotGamePage() {
   if (gs.gameStatus === "FINISHED") {
     const won = gs.winner === "player";
     return (
-      <div className="lobby-container" style={{ gap: 16 }}>
+      <div
+        style={{
+          flex: 1,
+          padding: 24,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: 24,
+          minHeight: "100vh",
+        }}
+      >
+        {/* Confetti Container */}
+        {won && (
+          <div className="confetti-container">
+            {confettiParticles.map((p) => (
+              <div
+                key={p.id}
+                className="confetti-particle"
+                style={{
+                  left: p.left,
+                  top: p.top,
+                  backgroundColor: p.color,
+                  ["--dx" as any]: p.dx,
+                  ["--dy" as any]: p.dy,
+                  ["--rot" as any]: p.rot,
+                  ["--duration" as any]: p.duration,
+                }}
+              />
+            ))}
+          </div>
+        )}
+
         <div
           className="glass-panel"
           style={{
-            width: "100%",
             padding: 32,
             textAlign: "center",
-            boxSizing: "border-box",
+            maxWidth: 500,
+            margin: "0 auto",
+            width: "100%",
+            zIndex: 10,
           }}
         >
-          <div style={{ fontSize: 64, marginBottom: 8 }}>
+          <span style={{ fontSize: 64, display: "block", marginBottom: 12 }}>
             {won ? "🏆" : "😢"}
-          </div>
+          </span>
           <h2
             style={{
               margin: "0 0 8px 0",
@@ -636,65 +960,10 @@ export default function BotGamePage() {
           >
             Play Again
           </button>
-          <button onClick={() => router.push("/")} className="btn-secondary">
+          <button onClick={handleExit} className="btn-secondary">
             ← Back to Lobby
           </button>
         </div>
-      </div>
-    );
-  }
-
-  // ─── Wild picker ───────────────────────────────────────────────────────────
-  if (pendingWild) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.85)",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 100,
-        }}
-      >
-        <h2 style={{ color: "#fff", marginBottom: 20, fontWeight: 800 }}>
-          Choose a color
-        </h2>
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-        >
-          {(["R", "Y", "G", "B"] as const).map((col) => (
-            <button
-              key={col}
-              onClick={() => applyPlayerPlay(pendingWild, col)}
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                border: "3px solid #fff",
-                background: COLOR_MAP[col],
-                cursor: "pointer",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-                transition: "transform 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "scale(1.1)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "";
-              }}
-            />
-          ))}
-        </div>
-        <button
-          onClick={() => setPendingWild(null)}
-          className="btn-secondary"
-          style={{ marginTop: 24, width: 160 }}
-        >
-          Cancel
-        </button>
       </div>
     );
   }
@@ -715,24 +984,10 @@ export default function BotGamePage() {
   const needsToDraw =
     isPlayerTurn &&
     (gs.drawPenalty > 0 || (!gs.hasDrawnThisTurn && !hasPlayable));
-  const currentColorHex = COLOR_MAP[gs.currentColor] ?? "#888";
 
   // ─── Board ─────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100dvh",
-        width: "100vw",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        overflow: "hidden",
-        background:
-          "radial-gradient(circle at center, #0f2015 0%, #050a07 100%)",
-      }}
-    >
+    <div className="uno-table">
       {/* Header */}
       <div
         style={{
@@ -742,7 +997,12 @@ export default function BotGamePage() {
           padding: "10px 16px",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
           background: "rgba(0,0,0,0.3)",
-          flexShrink: 0,
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 52,
+          zIndex: 50,
         }}
       >
         <strong style={{ fontSize: 15, letterSpacing: 1 }}>UNO vs Bot</strong>
@@ -759,7 +1019,7 @@ export default function BotGamePage() {
             {isMuted ? "🔇" : "🔊"}
           </button>
           <button
-            onClick={() => router.push("/")}
+            onClick={handleExit}
             className="btn-secondary"
             style={{
               padding: "4px 10px",
@@ -776,301 +1036,503 @@ export default function BotGamePage() {
 
       {/* Alert */}
       {message && (
-        <div className="game-alert alert-success" style={{ top: 60 }}>
+        <div className="game-alert alert-success" style={{ top: 60, zIndex: 100 }}>
           {message}
         </div>
       )}
 
-      {/* Bot zone */}
-      <div
-        style={{
-          flexShrink: 0,
-          padding: "14px 16px 8px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg,#ff3333,#880000)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 18,
-              border: `2px solid ${gs.currentTurn === "bot" ? "#ffcc00" : "rgba(255,255,255,0.15)"}`,
-              boxShadow:
-                gs.currentTurn === "bot"
-                  ? "0 0 12px rgba(255,204,0,0.6)"
-                  : "none",
-            }}
-          >
-            🤖
-          </div>
-          <div>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Bot</span>
-            {gs.botCalledUno && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: 10,
-                  background: "#ff3333",
-                  color: "#fff",
-                  padding: "1px 5px",
-                  borderRadius: 4,
-                  fontWeight: 800,
-                }}
-              >
-                UNO
-              </span>
-            )}
-            {botThinking && (
-              <span style={{ marginLeft: 8, fontSize: 11, opacity: 0.5 }}>
-                thinking...
-              </span>
-            )}
-          </div>
-        </div>
+      {/* Top Zone - Bot Avatar & Cards Stack */}
+      <div className="opponents-top" style={{ marginTop: 52 }}>
         <div
-          style={{
-            display: "flex",
-            gap: 3,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            maxWidth: "100%",
-            overflow: "hidden",
-          }}
+          className={`opponent-avatar ${gs.currentTurn === "bot" ? "active-turn" : ""}`}
+          style={{ position: "relative" }}
         >
-          {Array.from({ length: Math.min(gs.botHand.length, 15) }).map((_, i) =>
-            renderCard("W_back", undefined, false, true, `bot-${i}`),
-          )}
-          {gs.botHand.length > 15 && (
-            <span style={{ alignSelf: "center", fontSize: 12, opacity: 0.6 }}>
-              +{gs.botHand.length - 15}
+          <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
+            🤖 Bot
+          </span>
+          <div className="opponent-card-stack">
+            {Array.from({ length: Math.min(3, gs.botHand.length) }).map((_, cIdx) => (
+              <div
+                key={cIdx}
+                className="opponent-card-mini"
+                style={{
+                  left: `${8 + cIdx * 4}px`,
+                  transform: `rotate(${cIdx * 6 - 6}deg)`,
+                  zIndex: cIdx,
+                  boxShadow: "-1px 1px 3px rgba(0,0,0,0.25)",
+                }}
+              />
+            ))}
+            {gs.botHand.length === 0 && (
+              <span style={{ fontSize: 9, color: "#00cc66", fontWeight: 800 }}>
+                Won!
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+            {gs.botHand.length} card{gs.botHand.length !== 1 ? "s" : ""}
+          </span>
+          {gs.botCalledUno && (
+            <span
+              style={{
+                position: "absolute",
+                bottom: -6,
+                right: -6,
+                fontSize: 10,
+                background: "#ff3333",
+                color: "#ffffff",
+                padding: "2px 6px",
+                borderRadius: 6,
+                fontWeight: 800,
+                boxShadow: "0 0 8px rgba(255,51,51,0.6)",
+                letterSpacing: 0.5,
+                zIndex: 10,
+              }}
+            >
+              UNO
             </span>
           )}
-          {gs.botHand.length === 0 && (
-            <span style={{ fontSize: 12, color: "#00cc66", fontWeight: 800 }}>
-              No cards!
+          {botThinking && (
+            <span
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "calc(100% + 12px)",
+                transform: "translateY(-50%)",
+                fontSize: 11,
+                opacity: 0.8,
+                background: "rgba(0,0,0,0.6)",
+                padding: "3px 8px",
+                borderRadius: 8,
+                whiteSpace: "nowrap",
+              }}
+            >
+              thinking...
             </span>
           )}
         </div>
-        <span style={{ fontSize: 12, opacity: 0.5 }}>
-          {gs.botHand.length} card{gs.botHand.length !== 1 ? "s" : ""}
-        </span>
       </div>
 
-      {/* Table felt */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          padding: "8px 16px",
-          background:
-            "radial-gradient(circle at center, #145c2d 0%, #082d14 100%)",
-          borderTop: "4px solid #4a2810",
-          borderBottom: "4px solid #4a2810",
-          position: "relative",
-        }}
-      >
+      {/* Central Play Table (Felt Style) */}
+      <div className="table-felt">
+        {/* Table Header Row (Turn & Color) */}
         <div
+          className="table-header-row"
           style={{
-            position: "absolute",
-            top: 10,
-            left: 10,
-            padding: "4px 12px",
-            borderRadius: 20,
-            background: currentColorHex,
-            fontSize: 11,
-            fontWeight: 700,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
-            border: "1px solid rgba(255,255,255,0.2)",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 30,
           }}
         >
-          {COLOR_LABEL[gs.currentColor] ?? gs.currentColor}
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            fontSize: 11,
-            opacity: 0.7,
-            fontWeight: 700,
-          }}
-        >
-          {gs.currentTurn === "player" ? "⬇ Your turn" : "⬆ Bot's turn"}
-        </div>
-        {gs.drawPenalty > 0 && (
+          {/* Turn Announcement */}
           <div
             style={{
-              position: "absolute",
-              bottom: 10,
-              left: "50%",
-              transform: "translateX(-50%)",
-              background: "#ff3333",
-              color: "#fff",
-              padding: "4px 14px",
-              borderRadius: 20,
+              padding: "5px 12px",
+              borderRadius: 12,
+              background: "rgba(0,0,0,0.5)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: isPlayerTurn ? "#ffcc00" : "#fff",
               fontSize: 12,
-              fontWeight: 800,
-              boxShadow: "0 0 12px rgba(255,51,51,0.5)",
+              fontWeight: 700,
               whiteSpace: "nowrap",
             }}
           >
-            Draw penalty: {gs.drawPenalty}
+            {isPlayerTurn ? "👉 YOUR TURN 👈" : "🤖 BOT'S TURN"}
           </div>
-        )}
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+
+          {/* Current Active Color banner */}
           <div
-            onClick={isPlayerTurn ? playerDrawCard : undefined}
+            className="color-banner"
             style={{
-              cursor: isPlayerTurn ? "pointer" : "default",
-              opacity: isPlayerTurn ? 1 : 0.5,
+              background:
+                gs.currentColor === "R"
+                  ? "var(--color-red)"
+                  : gs.currentColor === "Y"
+                    ? "var(--color-yellow)"
+                    : gs.currentColor === "G"
+                      ? "var(--color-green)"
+                      : gs.currentColor === "B"
+                        ? "var(--color-blue)"
+                        : "#333",
+              color: gs.currentColor === "Y" ? "#000" : "#fff",
+              fontWeight: 900,
+              padding: "5px 12px",
+              fontSize: 12,
+              borderRadius: 12,
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {renderCard("W_back", undefined, needsToDraw, true, "draw")}
+            <span>
+              COLOR:{" "}
+              {gs.currentColor === "R"
+                ? "Red"
+                : gs.currentColor === "Y"
+                  ? "Yellow"
+                  : gs.currentColor === "G"
+                    ? "Green"
+                    : gs.currentColor === "B"
+                      ? "Blue"
+                      : "None"}
+            </span>
+          </div>
+        </div>
+
+        {/* Draw Pile and Discard Pile */}
+        <div className="pile-container">
+          {/* Draw Deck Stack */}
+          <div
+            onClick={isPlayerTurn ? playerDrawCard : undefined}
+            className={`uno-card card-back deck-stack-3d ${needsToDraw ? "active-turn" : ""}`}
+            style={{
+              cursor: isPlayerTurn && (!gs.hasDrawnThisTurn || gs.drawPenalty > 0) ? "pointer" : "not-allowed",
+              opacity: isPlayerTurn && (!gs.hasDrawnThisTurn || gs.drawPenalty > 0) ? 1 : 0.7,
+              position: "relative",
+            }}
+          >
+            {/* Glowing Deck Count Badge */}
             <div
               style={{
-                textAlign: "center",
-                fontSize: 10,
-                opacity: 0.6,
-                marginTop: 4,
+                position: "absolute",
+                top: 8,
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "rgba(255, 255, 255, 1)",
+                border: "1.5px solid #ff0000",
+                color: "#ff0000",
+                borderRadius: "10px",
+                padding: "2px 8px",
+                fontSize: "11px",
+                fontWeight: 900,
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+                zIndex: 20,
+                whiteSpace: "nowrap",
               }}
             >
-              {gs.deck.length} left
+              {gs.deck.length}
             </div>
           </div>
-          {renderCard(topCard, undefined, false, false, "discard")}
+
+          {/* Discard Pile Top Card */}
+          <div style={{ display: "inline-flex" }}>
+            {gs.discardPile.length > 0 &&
+              renderUnoCard(
+                topCard,
+                undefined,
+                {
+                  cursor: "default",
+                  animation: "card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+                },
+                topCard,
+              )}
+          </div>
+        </div>
+
+        {/* Draw Penalty Alert */}
+        {gs.drawPenalty > 0 && isPlayerTurn && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "rgba(255, 40, 40, 0.18)",
+              border: "1.5px solid rgba(255,80,80,0.55)",
+              borderRadius: 12,
+              padding: "7px 20px",
+              color: "#ff5555",
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: 0.4,
+              boxShadow: "0 0 16px rgba(255,51,51,0.25)",
+              animation: "pulse 1.2s infinite",
+              marginTop: 12,
+            }}
+          >
+            ⚠️ Draw {gs.drawPenalty} card{gs.drawPenalty !== 1 ? "s" : ""}! Click the deck!
+          </div>
+        )}
+
+        {/* No playable cards hint — shown when it's your turn but no card can be played */}
+        {isPlayerTurn &&
+          gs.drawPenalty === 0 &&
+          !gs.hasDrawnThisTurn &&
+          gs.playerHand.length > 0 &&
+          !hasPlayable && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(255,170,0,0.12)",
+                border: "1px solid rgba(255,170,0,0.4)",
+                borderRadius: 10,
+                padding: "5px 14px",
+                color: "#ffaa00",
+                fontWeight: 700,
+                fontSize: 12,
+                marginTop: 12,
+              }}
+            >
+              🎴 No playable cards — draw from the deck!
+            </div>
+          )}
+
+        {/* Action buttons on the table felt */}
+        <div
+          className="table-action-row"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            marginTop: 12,
+            zIndex: 30,
+          }}
+        >
+          {/* UNO shout button */}
+          <button
+            onClick={callUno}
+            className="btn-uno-shout"
+            disabled={!(gs.playerHand.length === 1 && !gs.playerCalledUno)}
+          >
+            UNO
+          </button>
+
+          {/* Pass Turn */}
+          {gs.hasDrawnThisTurn && gs.drawPenalty === 0 && isPlayerTurn && hasPlayable && (
+            <button
+              onClick={playerPassTurn}
+              className="btn-primary"
+              style={{
+                background: "#00cc66",
+                color: "#fff",
+                minHeight: 44,
+                padding: "0 20px",
+                width: "auto",
+                borderRadius: 12,
+                fontSize: 14,
+                fontWeight: 800,
+                boxShadow: "0 0 12px rgba(0,204,102,0.4)",
+                letterSpacing: 0.5,
+              }}
+            >
+              ✓ Pass
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Player zone */}
-      <div
-        style={{
-          flexShrink: 0,
-          background: "#0a0b10",
-          borderTop: "1.5px solid rgba(255,255,255,0.08)",
-          padding: "10px 12px 16px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 8,
-            paddingLeft: 4,
-            paddingRight: 4,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#3388ff,#0055cc)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 12,
-                border: `2px solid ${isPlayerTurn ? "#ffcc00" : "rgba(255,255,255,0.15)"}`,
-              }}
-            >
-              {nickname.charAt(0).toUpperCase()}
+      {/* Bottom Player Hand & Info */}
+      <div className="player-bottom-panel">
+        <div className="hand-wrapper">
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "0 12px 6px 12px",
+              fontSize: 13,
+              opacity: 0.8,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span>Your Hand ({gs.playerHand.length} cards)</span>
+              {gs.playerCalledUno && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    background: "#ff3333",
+                    color: "#ffffff",
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    fontWeight: 800,
+                    boxShadow: "0 0 8px rgba(255,51,51,0.6)",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  UNO DECLARED
+                </span>
+              )}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>{nickname}</span>
-            {gs.playerCalledUno && (
-              <span
-                style={{
-                  fontSize: 10,
-                  background: "#ff3333",
-                  color: "#fff",
-                  padding: "1px 5px",
-                  borderRadius: 4,
-                  fontWeight: 800,
-                }}
-              >
-                UNO
+            {isPlayerTurn && (
+              <span style={{ color: "#ffcc00", fontWeight: 800 }}>
+                Your Turn to Play!
               </span>
             )}
-            <span style={{ fontSize: 11, opacity: 0.5 }}>
-              {gs.playerHand.length} cards
-            </span>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {gs.playerHand.length === 1 && !gs.playerCalledUno && (
-              <button
-                onClick={callUno}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 8,
-                  border: "2px solid #ffcc00",
-                  background: "rgba(255,204,0,0.2)",
-                  color: "#ffcc00",
-                  fontWeight: 900,
-                  fontSize: 12,
-                  cursor: "pointer",
-                  animation: "uno-btn-pulse 1.2s infinite",
-                }}
-              >
-                UNO!
-              </button>
-            )}
-            {gs.hasDrawnThisTurn && gs.drawPenalty === 0 && isPlayerTurn && (
-              <button
-                onClick={playerPassTurn}
-                className="btn-secondary"
-                style={{ padding: "4px 10px", fontSize: 12, minHeight: 30 }}
-              >
-                Pass
-              </button>
-            )}
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            overflowX: "auto",
-            paddingBottom: 4,
-            paddingTop: 8,
-            scrollbarWidth: "none",
-            background: "#0a0b10",
-          }}
-        >
-          {sortedHand.map((card, idx) => {
-            const playable =
-              isPlayerTurn &&
-              isPlayable(
-                card,
-                gs.currentColor,
-                gs.currentValue,
-                gs.drawPenalty,
-                gs.hasDrawnThisTurn,
+
+          <div className="hand-container">
+            {sortedHand.map((card, idx) => {
+              const isCardPlayable =
+                isPlayerTurn &&
+                isPlayable(
+                  card,
+                  gs.currentColor,
+                  gs.currentValue,
+                  gs.drawPenalty,
+                  gs.hasDrawnThisTurn,
+                );
+              const baseStyle = getCardStyle(idx, gs.playerHand.length);
+              return (
+                <div
+                  className="hand-card-wrapper"
+                  key={idx}
+                  style={{
+                    ...baseStyle,
+                    cursor: isCardPlayable ? "pointer" : "not-allowed",
+                    zIndex: isCardPlayable ? 1000 + idx : idx,
+                    transform: isCardPlayable ? "translateY(-10px)" : "translateY(0px)",
+                    transition: "transform 0.2s ease, filter 0.2s ease",
+                  }}
+                  onClick={() => {
+                    if (isCardPlayable) {
+                      playerPlayCard(card);
+                    }
+                  }}
+                >
+                  {renderUnoCard(
+                    card,
+                    undefined,
+                    {
+                      transform: isCardPlayable ? "translateY(-4px) scale(1.08)" : "scale(1.0)",
+                      opacity: 1,
+                      filter: isCardPlayable ? "none" : "saturate(0.45) brightness(0.8)",
+                      cursor: isCardPlayable ? "pointer" : "not-allowed",
+                      pointerEvents: "none",
+                    },
+                    idx,
+                    isCardPlayable,
+                    false,
+                  )}
+                </div>
               );
-            return renderCard(
-              card,
-              playable ? () => playerPlayCard(card) : undefined,
-              playable,
-              false,
-              `${card}-${idx}`,
-            );
-          })}
+            })}
+          </div>
         </div>
       </div>
+
+
+      {/* Wild picker overlay */}
+      {pendingWild && (
+        <div
+          className="modal-overlay-animate"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(10px)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+            padding: 24,
+          }}
+        >
+          <div
+            className="glass-panel modal-content-animate"
+            style={{
+              padding: 32,
+              maxWidth: 380,
+              width: "100%",
+              textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+              border: "1px solid rgba(255,255,255,0.15)",
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: 12 }}>
+              {pendingWild.includes("WildDraw4") ? "⚡" : "🎨"}
+            </div>
+            <h3 style={{ margin: "0 0 6px 0", fontSize: 20, fontWeight: 900 }}>
+              {pendingWild.includes("WildDraw4") ? "Wild +4" : "Wild Card"}
+            </h3>
+            <p style={{ margin: "0 0 24px 0", fontSize: 13, opacity: 0.6 }}>
+              Choose a color to continue
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              {[
+                {
+                  code: "R",
+                  label: "Red",
+                  bg: "var(--color-red)",
+                  text: "#fff",
+                },
+                {
+                  code: "Y",
+                  label: "Yellow",
+                  bg: "var(--color-yellow)",
+                  text: "#000",
+                },
+                {
+                  code: "G",
+                  label: "Green",
+                  bg: "var(--color-green)",
+                  text: "#fff",
+                },
+                {
+                  code: "B",
+                  label: "Blue",
+                  bg: "var(--color-blue)",
+                  text: "#fff",
+                },
+              ].map(({ code, label, bg, text }) => (
+                <button
+                  key={code}
+                  onClick={() => applyPlayerPlay(pendingWild, code)}
+                  style={{
+                    background: bg,
+                    color: text,
+                    border: "3px solid transparent",
+                    borderRadius: 14,
+                    padding: "18px 12px",
+                    fontSize: 16,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                    transition: "transform 0.15s, box-shadow 0.15s",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+                    letterSpacing: 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.07)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 25px rgba(0,0,0,0.5)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 15px rgba(0,0,0,0.3)";
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setPendingWild(null)}
+              className="btn-secondary"
+              style={{
+                marginTop: 16,
+                width: "100%",
+                minHeight: 40,
+                fontSize: 13,
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
