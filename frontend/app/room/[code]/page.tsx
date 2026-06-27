@@ -2178,7 +2178,7 @@ export default function RoomPage() {
                           opacity: 1,
                           filter: isCardPlayable
                             ? "none"
-                            : "saturate(0.45) brightness(0.8)",
+                            : "saturate(0.3) brightness(0.38)",
                           cursor: isCardPlayable ? "pointer" : "not-allowed",
                           pointerEvents: "none",
                         },

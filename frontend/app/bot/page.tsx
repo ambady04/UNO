@@ -1394,7 +1394,7 @@ export default function BotGamePage() {
                     {
                       transform: isCardPlayable ? "translateY(-4px) scale(1.08)" : "scale(1.0)",
                       opacity: 1,
-                      filter: isCardPlayable ? "none" : "saturate(0.45) brightness(0.8)",
+                      filter: isCardPlayable ? "none" : "saturate(0.3) brightness(0.38)",
                       cursor: isCardPlayable ? "pointer" : "not-allowed",
                       pointerEvents: "none",
                     },
