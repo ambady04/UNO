@@ -187,40 +187,13 @@ class SoundManager {
         break;
       }
       case 'gameStart': {
-        // Rustling shuffling cards: 7 clicks in rapid sequence
-        for (let i = 0; i < 7; i++) {
-          const clickTime = now + i * 0.1;
-          const osc = this.ctx.createOscillator();
-          const clickGain = this.ctx.createGain();
-          osc.connect(clickGain);
-          clickGain.connect(this.ctx.destination);
-
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(150 + Math.random() * 100, clickTime);
-          osc.frequency.exponentialRampToValueAtTime(40, clickTime + 0.05);
-
-          clickGain.gain.setValueAtTime(0.1, clickTime);
-          clickGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.05);
-
-          osc.start(clickTime);
-          osc.stop(clickTime + 0.05);
-        }
-        // Slap/thump of card stack
-        const thumpTime = now + 0.75;
-        const thumpOsc = this.ctx.createOscillator();
-        const thumpGain = this.ctx.createGain();
-        thumpOsc.connect(thumpGain);
-        thumpGain.connect(this.ctx.destination);
-
-        thumpOsc.type = 'sine';
-        thumpOsc.frequency.setValueAtTime(140, thumpTime);
-        thumpOsc.frequency.exponentialRampToValueAtTime(60, thumpTime + 0.18);
-
-        thumpGain.gain.setValueAtTime(0.3, thumpTime);
-        thumpGain.gain.exponentialRampToValueAtTime(0.001, thumpTime + 0.18);
-
-        thumpOsc.start(thumpTime);
-        thumpOsc.stop(thumpTime + 0.18);
+        const audio = new Audio("/static/shuffling-cards.mp3");
+        audio.volume = 0.85;
+        audio.play().catch((err) => {
+          if (err.name !== "NotAllowedError") {
+            console.error("Failed to play gameStart card shuffle sound", err);
+          }
+        });
         break;
       }
       case 'gameWin': {

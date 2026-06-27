@@ -259,19 +259,13 @@ def handle_draw_card(state, player_id):
         
     penalty = state.get('draw_penalty', 0)
     if penalty > 0:
-        # Draw exactly 1 card
-        drawn = draw_cards_for_player(state, player_id, 1)
-        state['draw_penalty'] = penalty - 1
-        
-        if state['draw_penalty'] == 0:
-            # Finished drawing all penalty cards
-            state['has_drawn_this_turn'] = False
-            advance_turn(state, step=1)
-        else:
-            # Must continue drawing
-            state['has_drawn_this_turn'] = True
+        # Draw ALL penalty cards at once in a single atomic operation
+        drawn = draw_cards_for_player(state, player_id, penalty)
+        state['draw_penalty'] = 0
+        state['has_drawn_this_turn'] = False
+        advance_turn(state, step=1)
     else:
-        # Draw one card
+        # Draw one card (normal turn draw)
         drawn = draw_cards_for_player(state, player_id, 1)
         state['has_drawn_this_turn'] = True
         
