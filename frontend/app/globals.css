@@ -140,7 +140,7 @@ body {
   padding: 6px;
   box-sizing: border-box;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .table-felt {
@@ -310,6 +310,7 @@ body {
   min-width: 0;
   overflow: visible;
   z-index: 20;
+  position: relative;
   flex-shrink: 0;
   margin-top: auto !important;
 }
@@ -756,8 +757,9 @@ body {
     font-size: 15px;
   }
   .hand-container {
-    padding: 20px 20px 5px 20px;
-    height: 140px; /* Responsive height buffer for 114px cards on laptop viewports */
+    align-items: flex-end;
+    padding: 0 20px 5px 20px;
+    height: 175px;
   }
 }
 
@@ -787,10 +789,16 @@ body {
 
 .hand-container {
   display: flex;
-  padding: 36px 24px 6px 24px; /* Added more top padding buffer to prevent vertical card selection clipping */
-  height: 177px; /* Increased height accommodating translations */
+  /*
+   * Cards sit at the BOTTOM of a tall container via align-items:flex-end.
+   * The label row is now position:absolute overlaid at the top of hand-wrapper,
+   * so it never blocks hovering cards. Cards lift freely within the container.
+   */
+  align-items: flex-end;
+  height: 220px;
+  padding: 0 24px 6px 24px;
   overflow-x: auto;
-  overflow-y: visible; /* Try visible, browser falls back but large padding handles it */
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
   gap: 0px;
   scrollbar-width: none;
@@ -798,17 +806,17 @@ body {
   width: 100%;
   max-width: 100%;
   justify-content: flex-start;
+  position: relative;
 }
 @media (min-width: 480px) {
   .hand-container {
     justify-content: center;
   }
 }
-.hand-container::-webkit-scrollbar {
-  display: none;
-}
+
 
 .hand-card-wrapper {
+  position: relative;
   margin-right: var(--card-overlap, -36px);
   transition:
     transform 0.2s cubic-bezier(0.25, 1, 0.5, 1),
@@ -1430,17 +1438,14 @@ body {
     border-radius: 16px;
   }
 
-  /* Make hand and panels smaller to fit screens */
   .hand-wrapper {
     padding: 6px 4px 8px 4px;
   }
 
   .hand-container {
-    padding: 16px 12px 7px 12px; /* Top padding buffer for mobile */
-    height: 122px; /* Mobile height */
-    min-height: auto;
-    overflow-y: hidden;
-    /* Smooth horizontal scroll snapping on mobile touch screens */
+    align-items: flex-end;
+    height: 170px;
+    padding: 0 12px 7px 12px;
     scroll-snap-type: x mandatory;
   }
 
@@ -1572,8 +1577,9 @@ body {
     padding: 4px 4px 6px 4px !important;
   }
   .hand-container {
-    padding: 14px 20px 4px 20px !important;
-    height: 128px !important; /* Shrink hand container on short laptop screens */
+    align-items: flex-end !important;
+    padding: 0 20px 4px 20px !important;
+    height: 165px !important;
   }
 }
 

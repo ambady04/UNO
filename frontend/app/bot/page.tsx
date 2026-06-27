@@ -200,25 +200,25 @@ function applyBotPlayPure(
 
   if (cv === "Skip") {
     next = { ...next, currentTurn: "bot" };
-    return [next, "Bot played Skip — your turn is skipped!"];
+    return [next, `Bot played ${getCardName(cc, cv)} — your turn is skipped!`];
   }
   if (cv === "Reverse") {
     next = { ...next, currentTurn: "bot" };
-    return [next, "Bot played Reverse — acts as Skip in 1v1!"];
+    return [next, `Bot played ${getCardName(cc, cv)} — acts as Skip in 1v1!`];
   }
   if (cv === "Draw2") {
     next = { ...next, drawPenalty: s.drawPenalty + 2, currentTurn: "player" };
-    return [next, `Bot played +2! You must draw ${next.drawPenalty} card(s).`];
+    return [next, `Bot played ${getCardName(cc, cv)}! You must draw ${next.drawPenalty} card(s).`];
   }
   if (cv === "WildDraw4") {
     next = { ...next, drawPenalty: s.drawPenalty + 4, currentTurn: "player" };
     return [
       next,
-      `Bot played +4! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card(s).`,
+      `Bot played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card(s).`,
     ];
   }
   next = { ...next, currentTurn: "player" };
-  return [next, unoMsg || `Bot played ${cc}_${cv}.`];
+  return [next, unoMsg || `Bot played ${getCardName(cc, cv)}.`];
 }
 
 // ─── Display helpers ────────────────────────────────────────────────────────
@@ -229,12 +229,32 @@ const COLOR_MAP: Record<string, string> = {
   B: "var(--color-blue)",
   W: "var(--color-wild)",
 };
+
 const COLOR_LABEL: Record<string, string> = {
   R: "Red",
   Y: "Yellow",
   G: "Green",
   B: "Blue",
 };
+
+const COLOR_NAME: Record<string, string> = {
+  R: "Red",
+  G: "Green",
+  B: "Blue",
+  Y: "Yellow",
+  W: "Wild",
+};
+
+function getCardName(cc: string, cv: string): string {
+  if (cc === "W") {
+    if (cv === "Draw4") return "Wild Draw 4";
+    return "Wild";
+  }
+  const colorName = COLOR_NAME[cc] || cc;
+  let valueName = cv;
+  if (cv === "Draw2") valueName = "+2";
+  return `${colorName} ${valueName}`;
+}
 
 const getCardStyle = (index: number, total: number) => {
   // Dynamic overlaps based on total cards
@@ -435,6 +455,7 @@ export default function BotGamePage() {
   >([]);
 
   const prevGsRef = useRef<BotGameState | null>(null);
+  const botTurnInProgressRef = useRef(false);
 
   // No ref needed — setTimeout id is local; won't trigger "ref during render" lint
   const showMsg = useCallback((text: string) => {
@@ -472,7 +493,12 @@ export default function BotGamePage() {
             gameSounds.play("playCard");
           }
         } else if (current.deck.length !== prev.deck.length) {
-          gameSounds.play("drawCard");
+          const cardsDrawn = prev.deck.length - current.deck.length;
+          if (cardsDrawn > 1) {
+            gameSounds.play("gameStart");
+          } else {
+            gameSounds.play("drawCard");
+          }
         }
 
         if (current.currentTurn === "player" && prev.currentTurn !== "player") {
@@ -717,6 +743,7 @@ export default function BotGamePage() {
           [nextState, msg] = applyBotPlayPure(s, pick.card, pick.chosenColor);
         }
 
+        botTurnInProgressRef.current = false;
         setGs(nextState);
         if (msg) showMsg(msg);
       }, delay);
@@ -724,18 +751,21 @@ export default function BotGamePage() {
     [showMsg],
   );
 
-  // Trigger bot turn — deferred so setState isn't called synchronously inside an effect body
   useEffect(() => {
-    if (
-      !gs ||
-      gs.currentTurn !== "bot" ||
-      gs.gameStatus !== "PLAYING" ||
-      botThinking
-    )
+    if (!gs || gs.gameStatus !== "PLAYING") {
+      botTurnInProgressRef.current = false;
       return;
+    }
+    if (gs.currentTurn !== "bot") {
+      botTurnInProgressRef.current = false;
+      return;
+    }
+    if (botTurnInProgressRef.current) return;
+
+    botTurnInProgressRef.current = true;
     const id = setTimeout(() => runBotTurn(gs), 0);
     return () => clearTimeout(id);
-  }, [gs, botThinking, runBotTurn]);
+  }, [gs, runBotTurn]);
 
   // ─── Player actions ─────────────────────────────────────────────────────────
   function playerPlayCard(card: Card) {
@@ -786,20 +816,21 @@ export default function BotGamePage() {
     let msg = "";
     if (cv === "Skip") {
       next = { ...base, currentTurn: "player" };
-      msg = "You played Skip — bot's turn skipped!";
+      msg = `${nickname} played ${getCardName(cc, cv)} — bot's turn skipped!`;
     } else if (cv === "Reverse") {
       next = { ...base, currentTurn: "player" };
-      msg = "You played Reverse — acts as Skip in 1v1!";
+      msg = `${nickname} played ${getCardName(cc, cv)} — acts as Skip in 1v1!`;
     } else if (cv === "Draw2") {
       const penalty = gs.drawPenalty + 2;
       next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
-      msg = `+2! Bot must draw ${penalty} card(s).`;
+      msg = `${nickname} played ${getCardName(cc, cv)}! Bot must draw ${penalty} card(s).`;
     } else if (cv === "WildDraw4") {
       const penalty = gs.drawPenalty + 4;
       next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
-      msg = `+4! Color → ${COLOR_LABEL[color]}. Bot must draw ${penalty} card(s).`;
+      msg = `${nickname} played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Bot must draw ${penalty} card(s).`;
     } else {
       next = { ...base, currentTurn: "bot" };
+      msg = `${nickname} played ${getCardName(cc, cv)}.`;
     }
 
     setGs(next);
@@ -813,18 +844,17 @@ export default function BotGamePage() {
       showMsg("You already drew. Play a card or pass.");
       return;
     }
-    const { drawn, deck, discard } = drawCards(gs.deck, gs.discardPile, 1);
-    const newPenalty = gs.drawPenalty > 0 ? gs.drawPenalty - 1 : 0;
-    const penaltyDone = gs.drawPenalty > 0 && newPenalty === 0;
+    const count = gs.drawPenalty > 0 ? gs.drawPenalty : 1;
+    const { drawn, deck, discard } = drawCards(gs.deck, gs.discardPile, count);
     setGs({
       ...gs,
       playerHand: [...gs.playerHand, ...drawn],
       deck,
       discardPile: discard,
-      drawPenalty: newPenalty,
-      hasDrawnThisTurn: !penaltyDone,
+      drawPenalty: 0,
+      hasDrawnThisTurn: gs.drawPenalty === 0,
       playerCalledUno: false,
-      currentTurn: penaltyDone ? "bot" : gs.currentTurn,
+      currentTurn: gs.drawPenalty > 0 ? "bot" : gs.currentTurn,
     });
   }
 
@@ -1005,7 +1035,7 @@ export default function BotGamePage() {
           zIndex: 50,
         }}
       >
-        <strong style={{ fontSize: 15, letterSpacing: 1 }}>UNO vs Bot</strong>
+        <strong style={{ fontSize: 15, letterSpacing: 1 }}><span style={{ color: "#ffcc00ff" }}>UNO!  </span><span style={{ color: "#e41010ff" }}>Play vs Bot</span></strong>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={() => {
@@ -1328,42 +1358,7 @@ export default function BotGamePage() {
 
       {/* Bottom Player Hand & Info */}
       <div className="player-bottom-panel">
-        <div className="hand-wrapper">
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "0 12px 6px 12px",
-              fontSize: 13,
-              opacity: 0.8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>Your Hand ({gs.playerHand.length} cards)</span>
-              {gs.playerCalledUno && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    background: "#ff3333",
-                    color: "#ffffff",
-                    padding: "2px 6px",
-                    borderRadius: 6,
-                    fontWeight: 800,
-                    boxShadow: "0 0 8px rgba(255,51,51,0.6)",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  UNO DECLARED
-                </span>
-              )}
-            </div>
-            {isPlayerTurn && (
-              <span style={{ color: "#ffcc00", fontWeight: 800 }}>
-                Your Turn to Play!
-              </span>
-            )}
-          </div>
-
+        <div className="hand-wrapper" style={{ position: "relative" }}>
           <div className="hand-container">
             {sortedHand.map((card, idx) => {
               const isCardPlayable =
@@ -1410,6 +1405,48 @@ export default function BotGamePage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Label row: absolutely positioned so it NEVER sits in the stacking
+              order above the card container — cards can always hover above it */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "0 12px 6px 12px",
+              fontSize: 13,
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "rgba(255,255,255,0.8)" }}>Your Hand ({gs.playerHand.length} cards)</span>
+              {gs.playerCalledUno && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    background: "#ff3333",
+                    color: "#ffffff",
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    fontWeight: 800,
+                    boxShadow: "0 0 8px rgba(255,51,51,0.6)",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  UNO DECLARED
+                </span>
+              )}
+            </div>
+            {isPlayerTurn && (
+              <span style={{ color: "#ffcc00", fontWeight: 800 }}>
+                Your Turn to Play!
+              </span>
+            )}
           </div>
         </div>
       </div>

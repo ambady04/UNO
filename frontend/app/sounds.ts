@@ -189,7 +189,11 @@ class SoundManager {
       case 'gameStart': {
         const audio = new Audio("/static/shuffling-cards.mp3");
         audio.volume = 0.85;
-        audio.play().catch((err) => console.error("Failed to play gameStart card shuffle sound", err));
+        audio.play().catch((err) => {
+          if (err.name !== "NotAllowedError") {
+            console.error("Failed to play gameStart card shuffle sound", err);
+          }
+        });
         break;
       }
       case 'gameWin': {

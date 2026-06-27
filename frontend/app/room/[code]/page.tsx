@@ -23,6 +23,25 @@ const QUICK_CHAT_OPTIONS = [
   { label: "😭", sound: "cry_male_01" },
 ];
 
+const COLOR_NAME: Record<string, string> = {
+  R: "Red",
+  G: "Green",
+  B: "Blue",
+  Y: "Yellow",
+  W: "Wild",
+};
+
+function getCardName(cc: string, cv: string): string {
+  if (cc === "W") {
+    if (cv === "Draw4") return "Wild Draw 4";
+    return "Wild";
+  }
+  const colorName = COLOR_NAME[cc] || cc;
+  let valueName = cv;
+  if (cv === "Draw2") valueName = "+2";
+  return `${colorName} ${valueName}`;
+}
+
 interface PlayerState {
   id: string;
   name: string;
@@ -242,6 +261,14 @@ export default function RoomPage() {
           const parts = currTop.split("_");
           const color = parts[0];
           const val = parts[1];
+
+          const playerWhoPlayed = prev.players[prev.current_turn];
+          if (playerWhoPlayed) {
+            const formattedCard = getCardName(color, val);
+            const name = playerWhoPlayed.id === guest?.token ? "You" : playerWhoPlayed.name;
+            showAlert(`${name} played ${formattedCard}`, "success");
+          }
+
           if (val === "WildDraw4") {
             gameSounds.play("playPlus4");
           } else if (val === "Draw2") {
@@ -255,7 +282,12 @@ export default function RoomPage() {
         // Compare deck count or hand card count to detect Draw Card
         // (Only play draw card sound if a card wasn't just played in the same update)
         else if (current.deck_count !== prev.deck_count) {
-          gameSounds.play("drawCard");
+          const cardsDrawn = Math.abs(prev.deck_count - current.deck_count);
+          if (cardsDrawn > 1) {
+            gameSounds.play("gameStart");
+          } else {
+            gameSounds.play("drawCard");
+          }
         }
 
         // Compare turn changes (My Turn)
@@ -428,7 +460,11 @@ export default function RoomPage() {
             if (option && !gameSounds.getMute()) {
               const audio = new Audio(`https://www.myinstants.com/media/sounds/${option.sound}.mp3`);
               audio.volume = 0.6;
-              audio.play().catch((err) => console.error("Failed to play quick chat sound", err));
+              audio.play().catch((err) => {
+                if (err.name !== "NotAllowedError") {
+                  console.error("Failed to play quick chat sound", err);
+                }
+              });
             }
           } else {
             gameSounds.play("chat");
@@ -655,9 +691,12 @@ export default function RoomPage() {
       return;
     }
 
-    // If there's still a draw penalty, the player must keep drawing
-    if ((gameState.draw_penalty || 0) > 0) {
-      sendSocketMessage("draw_card");
+    // If there's still a draw penalty, draw all cards at once
+    const penalty = gameState.draw_penalty || 0;
+    if (penalty > 0) {
+      for (let i = 0; i < penalty; i++) {
+        sendSocketMessage("draw_card");
+      }
       return;
     }
 
@@ -733,7 +772,11 @@ export default function RoomPage() {
     if (!gameSounds.getMute()) {
       const audio = new Audio(`https://www.myinstants.com/media/sounds/${soundFile}.mp3`);
       audio.volume = 0.6;
-      audio.play().catch((err) => console.error("Failed to play local quick chat sound", err));
+      audio.play().catch((err) => {
+        if (err.name !== "NotAllowedError") {
+          console.error("Failed to play local quick chat sound", err);
+        }
+      });
     }
   }
 
@@ -2072,42 +2115,7 @@ export default function RoomPage() {
 
           {/* Bottom Player Hand & Info */}
           <div className="player-bottom-panel">
-            <div className="hand-wrapper">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  padding: "0 12px 6px 12px",
-                  fontSize: 13,
-                  opacity: 0.8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span>Your Hand ({gameState.hand.length} cards)</span>
-                  {myPlayer?.called_uno && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        background: "#ff3333",
-                        color: "#ffffff",
-                        padding: "2px 6px",
-                        borderRadius: 6,
-                        fontWeight: 800,
-                        boxShadow: "0 0 8px rgba(255,51,51,0.6)",
-                        letterSpacing: 0.5,
-                      }}
-                    >
-                      UNO DECLARED
-                    </span>
-                  )}
-                </div>
-                {isMyTurn && (gameState.draw_penalty || 0) === 0 && (
-                  <span style={{ color: "#ffcc00", fontWeight: 800 }}>
-                    Your Turn to Play!
-                  </span>
-                )}
-              </div>
-
+            <div className="hand-wrapper" style={{ position: "relative" }}>
               <div className="hand-container">
                 {sortHand(gameState.hand).map((card, idx) => {
                   const isCardPlayable = isMyTurn && checkPlayableClient(card);
@@ -2158,6 +2166,48 @@ export default function RoomPage() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Label row: absolutely positioned so it NEVER sits in the stacking
+                  order above the card container — cards can always hover above it */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "0 12px 6px 12px",
+                  fontSize: 13,
+                  pointerEvents: "none",
+                  zIndex: 1,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: "rgba(255,255,255,0.8)" }}>Your Hand ({gameState.hand.length} cards)</span>
+                  {myPlayer?.called_uno && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        background: "#ff3333",
+                        color: "#ffffff",
+                        padding: "2px 6px",
+                        borderRadius: 6,
+                        fontWeight: 800,
+                        boxShadow: "0 0 8px rgba(255,51,51,0.6)",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      UNO DECLARED
+                    </span>
+                  )}
+                </div>
+                {isMyTurn && (gameState.draw_penalty || 0) === 0 && (
+                  <span style={{ color: "#ffcc00", fontWeight: 800 }}>
+                    Your Turn to Play!
+                  </span>
+                )}
               </div>
             </div>
           </div>
