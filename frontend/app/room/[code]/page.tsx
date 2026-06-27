@@ -188,6 +188,8 @@ export default function RoomPage() {
   }, []);
 
   const prevGameStateRef = useRef<FilteredGameState | null>(null);
+  const playedPenaltyDrawSoundRef = useRef<boolean>(false);
+  const pendingPenaltyDrawsRef = useRef<number>(0);
   const chatRef = useRef<HTMLDivElement | null>(null);
 
   // Close chat on click outside
@@ -279,12 +281,14 @@ export default function RoomPage() {
             gameSounds.play("playCard");
           }
         }
-        // Compare deck count or hand card count to detect Draw Card
+        // Compare deck count to detect Draw Card sounds
         // (Only play draw card sound if a card wasn't just played in the same update)
         else if (current.deck_count !== prev.deck_count) {
           const cardsDrawn = Math.abs(prev.deck_count - current.deck_count);
           if (cardsDrawn > 1) {
-            gameSounds.play("gameStart");
+            // Multiple cards drawn at once (atomic penalty draw) — sound already played on click
+          } else if (pendingPenaltyDrawsRef.current > 0 || (prev.draw_penalty || 0) > 0) {
+            // Still in sequential penalty draw loop — shuffle sound was already played on click, skip
           } else {
             gameSounds.play("drawCard");
           }
@@ -443,6 +447,24 @@ export default function RoomPage() {
 
         localVersionRef.current = version;
         setGameState(state);
+
+        // Sequential penalty draw loop:
+        // When pendingPenaltyDrawsRef > 0, we auto-send the next draw_card
+        // so the user only needs to click once to draw all penalty cards.
+        if (pendingPenaltyDrawsRef.current > 0 && (state.draw_penalty || 0) > 0) {
+          const activePlayerId = state.players[state.current_turn]?.id;
+          const myToken = localStorage.getItem("uno_guest_token");
+          if (activePlayerId === myToken) {
+            pendingPenaltyDrawsRef.current -= 1;
+            sendSocketMessage("draw_card");
+          } else {
+            // Turn changed unexpectedly — reset
+            pendingPenaltyDrawsRef.current = 0;
+          }
+        } else if ((state.draw_penalty || 0) === 0) {
+          // All penalty cards drawn — reset counter
+          pendingPenaltyDrawsRef.current = 0;
+        }
       } else if (data.type === "chat_message") {
         const msg: ChatMessage = data;
         setChatMessages((prev) => [...prev, msg]);
@@ -691,12 +713,13 @@ export default function RoomPage() {
       return;
     }
 
-    // If there's still a draw penalty, draw all cards at once
+    // If there's a draw penalty, start a sequential loop that auto-draws all cards
+    // with just a single click (mirrors bot mode's "draw all at once" behavior)
     const penalty = gameState.draw_penalty || 0;
     if (penalty > 0) {
-      for (let i = 0; i < penalty; i++) {
-        sendSocketMessage("draw_card");
-      }
+      gameSounds.play("gameStart"); // Play shuffle sound once immediately
+      pendingPenaltyDrawsRef.current = penalty - 1; // Remaining after this first send
+      sendSocketMessage("draw_card");
       return;
     }
 
