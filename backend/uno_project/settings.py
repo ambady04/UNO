@@ -130,6 +130,11 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
-STATIC_ROOT = "/var/www/uno-game/static/"
+STATIC_ROOT = "/var/www/uno-game/UNO/frontend/public/"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -4,6 +4,9 @@ from django.db import models
 class GuestUser(models.Model):
     token = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nickname = models.CharField(max_length=50)
+    email = models.EmailField(unique=True, null=True, blank=True)
+    is_registered = models.BooleanField(default=False)
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -16,6 +19,15 @@ class GuestUser(models.Model):
 
     def __str__(self):
         return f"{self.nickname} ({str(self.token)[:8]})"
+
+class OTPRequest(models.Model):
+    email = models.EmailField()
+    otp_code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def __str__(self):
+        return f"{self.email} - {self.otp_code}"
 
 class Room(models.Model):
     STATUS_CHOICES = (

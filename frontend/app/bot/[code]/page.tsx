@@ -7,6 +7,13 @@ import { useRouter, useParams } from "next/navigation";
 import { getStoredGuest } from "../../api";
 import { gameSounds } from "../../sounds";
 
+function getAbsoluteAvatarUrl(url: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return `${BASE_URL}${url}`;
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type Card = string;
 
@@ -359,6 +366,7 @@ export default function BotGamePage() {
   const storageKey = `uno_bot_game_state_${code}`;
 
   const [nickname, setNickname] = useState("You");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [gs, setGs] = useState<BotGameState | null>(null);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   const toastIdRef = useRef(0);
@@ -475,8 +483,10 @@ export default function BotGamePage() {
     const stored = getStoredGuest();
     const muted = gameSounds.getMute();
     const saved = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
+    const storedAvatar = typeof window !== "undefined" ? localStorage.getItem("uno_guest_avatar") : null;
     const id = setTimeout(() => {
       if (stored) setNickname(stored.nickname);
+      if (storedAvatar) setAvatarUrl(storedAvatar);
       setIsMuted(muted);
       if (saved) {
         try {
@@ -829,6 +839,22 @@ export default function BotGamePage() {
           </div>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", padding: "0 12px 6px 12px", fontSize: 13, pointerEvents: "none", zIndex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {avatarUrl ? (
+                <img
+                  src={getAbsoluteAvatarUrl(avatarUrl) || ""}
+                  alt="Avatar"
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "1.5px solid #3388ff",
+                    boxShadow: "0 0 6px rgba(51,136,255,0.4)"
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 14 }}>👤</span>
+              )}
               <span style={{ color: "rgba(255,255,255,0.8)" }}>Your Hand ({gs.playerHand.length} cards)</span>
               {gs.playerCalledUno && (
                 <span style={{ fontSize: 10, background: "#ff3333", color: "#ffffff", padding: "2px 6px", borderRadius: 6, fontWeight: 800, boxShadow: "0 0 8px rgba(255,51,51,0.6)", letterSpacing: 0.5 }}>UNO DECLARED</span>
