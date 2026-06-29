@@ -11,8 +11,25 @@ export default function BotRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Generate a 6-character alphanumeric room code
-    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    // Generate a 6-char code from a mixed pool — always letters + digits
+    // Avoids ambiguous chars: 0/O, 1/I, 5/S, 8/B
+    const LETTERS = "ACDEFGHJKLMNPQRTUVWXY";
+    const DIGITS  = "2346789";
+    const ALL     = LETTERS + DIGITS;
+
+    // Guarantee at least 2 digits and 2 letters in the code
+    const pick = (pool: string) => pool[Math.floor(Math.random() * pool.length)];
+    const parts = [
+      pick(LETTERS), pick(LETTERS),
+      pick(DIGITS),  pick(DIGITS),
+      pick(ALL),     pick(ALL),
+    ];
+    // Fisher-Yates shuffle so the guaranteed chars aren't always in fixed positions
+    for (let i = parts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [parts[i], parts[j]] = [parts[j], parts[i]];
+    }
+    const code = parts.join("");
     router.replace(`/bot/${code}`);
   }, [router]);
 
