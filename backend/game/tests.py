@@ -7,7 +7,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import GuestUser, Room, RoomPlayer
+from .models import GuestUser, Room, RoomPlayer, OTPRequest
 from .state_manager import GameStateManager, VersionMismatchError
 from . import game_logic
 
@@ -56,8 +56,8 @@ class RoomAPITests(APITestCase):
 
     def test_join_room_full(self):
         room = Room.objects.create(code='FULLRM', host=self.user1, status='LOBBY')
-        # Add 6 players
-        for i in range(6):
+        # Add 10 players
+        for i in range(10):
             u = GuestUser.objects.create(nickname=f'User_{i}')
             RoomPlayer.objects.create(room=room, user=u, slot_index=i)
 
@@ -343,4 +343,92 @@ class PlayerKickTests(TestCase):
         self.manager.save_state(self.room_code, updated)
         
         self.assertEqual(updated['game_status'], 'FINISHED')
+
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+class OTPAndProfileTests(APITestCase):
+    def test_otp_send_and_verify(self):
+        # 1. Send OTP
+        url = reverse('send_otp')
+        response = self.client.post(url, {'email': 'test@example.com'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(OTPRequest.objects.filter(email='test@example.com').exists())
+
+        # Retrieve generated OTP
+        otp_req = OTPRequest.objects.get(email='test@example.com')
+        code = otp_req.otp_code
+
+        # 2. Verify OTP
+        url_verify = reverse('verify_otp')
+        response = self.client.post(url_verify, {
+            'email': 'test@example.com',
+            'otp': code,
+            'nickname': 'TestUser'
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('token', response.data)
+        self.assertEqual(response.data['user']['nickname'], 'TestUser')
+        
+        # Verify GuestUser created and marked is_registered
+        user = GuestUser.objects.get(email='test@example.com')
+        self.assertTrue(user.is_registered)
+
+    def test_profile_update(self):
+        user = GuestUser.objects.create(nickname='OldName', email='profile@example.com', is_registered=True)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {user.token}')
+        
+        # Mock image upload
+        image_content = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+        avatar = SimpleUploadedFile("avatar.png", image_content, content_type="image/png")
+        
+        url = reverse('user_profile')
+        response = self.client.post(url, {
+            'nickname': 'NewName',
+            'avatar': avatar
+        }, format='multipart')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        user.refresh_from_db()
+        self.assertEqual(user.nickname, 'NewName')
+        self.assertTrue(user.avatar)
+
+    def test_password_signup_and_login(self):
+        # 1. Sign up with OTP and password
+        url_send = reverse('send_otp')
+        self.client.post(url_send, {'email': 'pwd@example.com'})
+        otp_code = OTPRequest.objects.get(email='pwd@example.com').otp_code
+
+        url_verify = reverse('verify_otp')
+        res_verify = self.client.post(url_verify, {
+            'email': 'pwd@example.com',
+            'otp': otp_code,
+            'nickname': 'PwdUser',
+            'password': 'secretpassword123'
+        })
+        self.assertEqual(res_verify.status_code, status.HTTP_200_OK)
+        
+        # Check email status
+        url_check = reverse('check_email')
+        res_check = self.client.post(url_check, {'email': 'pwd@example.com'})
+        self.assertEqual(res_check.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_check.data['exists'])
+        self.assertTrue(res_check.data['has_password'])
+
+        # 2. Login with password
+        url_login = reverse('login_password')
+        res_login = self.client.post(url_login, {
+            'email': 'pwd@example.com',
+            'password': 'secretpassword123'
+        })
+        self.assertEqual(res_login.status_code, status.HTTP_200_OK)
+        self.assertIn('token', res_login.data)
+        self.assertEqual(res_login.data['user']['nickname'], 'PwdUser')
+
+        # 3. Invalid password login
+        res_invalid = self.client.post(url_login, {
+            'email': 'pwd@example.com',
+            'password': 'wrongpassword'
+        })
+        self.assertEqual(res_invalid.status_code, status.HTTP_400_BAD_REQUEST)
 

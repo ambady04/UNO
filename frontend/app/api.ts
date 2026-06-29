@@ -116,3 +116,122 @@ export async function getGameHistory(): Promise<HistoryResponse[]> {
   }
   return res.json();
 }
+
+export interface ProfileResponse {
+  token: string;
+  nickname: string;
+  email: string | null;
+  is_registered: boolean;
+  avatar: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export async function sendOtp(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${BASE_URL}/api/auth/send-otp/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to send OTP.');
+  }
+  return res.json();
+}
+
+export async function checkEmail(email: string): Promise<{ exists: boolean; has_password: boolean; nickname?: string }> {
+  const res = await fetch(`${BASE_URL}/api/auth/check-email/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to check email.');
+  }
+  return res.json();
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<{ token: string; user: ProfileResponse }> {
+  const res = await fetch(`${BASE_URL}/api/auth/login-password/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to login with password.');
+  }
+  const data = await res.json();
+  setStoredGuest(data.token, data.user.nickname);
+  if (data.user.avatar_url) {
+    localStorage.setItem('uno_guest_avatar', data.user.avatar_url);
+  } else {
+    localStorage.removeItem('uno_guest_avatar');
+  }
+  return data;
+}
+
+export async function verifyOtp(email: string, otp: string, nickname?: string, password?: string): Promise<{ token: string; user: ProfileResponse }> {
+  const res = await fetch(`${BASE_URL}/api/auth/verify-otp/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp, nickname, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to verify OTP.');
+  }
+  const data = await res.json();
+  setStoredGuest(data.token, data.user.nickname);
+  if (data.user.avatar_url) {
+    localStorage.setItem('uno_guest_avatar', data.user.avatar_url);
+  } else {
+    localStorage.removeItem('uno_guest_avatar');
+  }
+  return data;
+}
+
+export async function getUserProfile(): Promise<ProfileResponse> {
+  const res = await fetch(`${BASE_URL}/api/user/profile/`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to get user profile.');
+  }
+  return res.json();
+}
+
+export async function updateUserProfile(nickname: string, avatarFile?: File): Promise<ProfileResponse> {
+  const formData = new FormData();
+  if (nickname) formData.append('nickname', nickname);
+  if (avatarFile) formData.append('avatar', avatarFile);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('uno_guest_token') : null;
+  const headers: HeadersInit = {};
+  if (token) {
+    headers['Authorization'] = `Token ${token}`;
+  }
+
+  const res = await fetch(`${BASE_URL}/api/user/profile/`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to update profile.');
+  }
+  const data: ProfileResponse = await res.json();
+  setStoredGuest(data.token, data.nickname);
+  if (data.avatar_url) {
+    localStorage.setItem('uno_guest_avatar', data.avatar_url);
+  } else {
+    localStorage.removeItem('uno_guest_avatar');
+  }
+  return data;
+}
+

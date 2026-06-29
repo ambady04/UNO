@@ -130,6 +130,17 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "/static/"
-STATIC_ROOT = "/var/www/uno-game/static/"
+STATIC_ROOT = "/var/www/uno-game/UNO/frontend/public/"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'games.ambady.space@gmail.com'
+EMAIL_HOST_PASSWORD = 'yjab dxle kzlf gyor'
+DEFAULT_FROM_EMAIL = '"UNO! Multiplayer" <games.ambady.space@gmail.com>'
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

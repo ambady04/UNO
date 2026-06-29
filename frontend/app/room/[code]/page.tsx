@@ -12,6 +12,13 @@ import {
 } from "../../api";
 import { gameSounds } from "../../sounds";
 
+function getAbsoluteAvatarUrl(url: string | null) {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  return `${BASE_URL}${url}`;
+}
+
 const QUICK_CHAT_OPTIONS = [
   { label: "😫", sound: "faaah" },
   { label: "💥", sound: "vine-boom" },
@@ -48,6 +55,7 @@ interface PlayerState {
   is_connected: boolean;
   called_uno: boolean;
   card_count: number;
+  avatar_url?: string | null;
 }
 
 interface FilteredGameState {
@@ -85,6 +93,7 @@ export default function RoomPage() {
     token: string;
     nickname: string;
   } | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [roomDetails, setRoomDetails] = useState<RoomResponse | null>(null);
   const [gameState, setGameState] = useState<FilteredGameState | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -364,11 +373,13 @@ export default function RoomPage() {
   useEffect(() => {
     isUnmountedRef.current = false;
     const stored = getStoredGuest();
+    const storedAvatar = typeof window !== "undefined" ? localStorage.getItem("uno_guest_avatar") : null;
     if (!stored) {
       router.push(`/?redirect=${roomCode}`);
       return;
     }
     setGuest(stored);
+    if (storedAvatar) setAvatarUrl(storedAvatar);
     loadRoom(stored.token);
 
     return () => {
@@ -1184,7 +1195,16 @@ export default function RoomPage() {
           </button>
         )}
 
-        <div className="compact-opponent-avatar">{initial}</div>
+        {p.avatar_url ? (
+          <img
+            src={getAbsoluteAvatarUrl(p.avatar_url) || ""}
+            alt="Avatar"
+            className="compact-opponent-avatar"
+            style={{ objectFit: "cover" }}
+          />
+        ) : (
+          <div className="compact-opponent-avatar">{initial}</div>
+        )}
 
         <span className="compact-opponent-name">{p.name}</span>
 
@@ -1258,6 +1278,39 @@ export default function RoomPage() {
           >
             ×
           </button>
+        )}
+        {p.avatar_url ? (
+          <img
+            src={getAbsoluteAvatarUrl(p.avatar_url) || ""}
+            alt="Avatar"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              objectFit: "cover",
+              border: "2px solid #3388ff",
+              boxShadow: "0 0 8px rgba(51,136,255,0.35)",
+              marginBottom: 6,
+              display: "block"
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.08)",
+              border: "1.5px dashed rgba(255,255,255,0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 16,
+              marginBottom: 6
+            }}
+          >
+            👤
+          </div>
         )}
         <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
           {p.name}
@@ -1523,10 +1576,40 @@ export default function RoomPage() {
                     borderRadius: 10,
                   }}
                 >
-                  <div>
-                    <span style={{ opacity: 0.4, marginRight: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ opacity: 0.4 }}>
                       #{idx + 1}
                     </span>
+                    {p.avatar_url ? (
+                      <img
+                        src={getAbsoluteAvatarUrl(p.avatar_url) || ""}
+                        alt="Avatar"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          border: "1.5px solid #3388ff",
+                          boxShadow: "0 0 6px rgba(51,136,255,0.3)"
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          background: "rgba(255,255,255,0.08)",
+                          border: "1px dashed rgba(255,255,255,0.2)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12
+                        }}
+                      >
+                        👤
+                      </div>
+                    )}
                     <strong>{p.name}</strong>
                     {p.id === guest?.token && (
                       <span
@@ -2272,6 +2355,22 @@ export default function RoomPage() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {avatarUrl ? (
+                    <img
+                      src={getAbsoluteAvatarUrl(avatarUrl) || ""}
+                      alt="Avatar"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "1.5px solid #3388ff",
+                        boxShadow: "0 0 6px rgba(51,136,255,0.4)"
+                      }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 14 }}>👤</span>
+                  )}
                   <span style={{ color: "rgba(255,255,255,0.8)" }}>Your Hand ({gameState.hand.length} cards)</span>
                   {myPlayer?.called_uno && (
                     <span

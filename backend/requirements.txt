@@ -21,10 +21,12 @@ Incremental==24.11.0
 legacy-cgi==2.6.4
 msgpack==1.2.0
 packaging==26.2
+pillow==12.2.0
 psycopg2-binary==2.9.12
 py-ubjson==0.16.1
 pycparser==3.0
 pyOpenSSL==26.3.0
+python-dotenv==1.2.2
 redis==8.0.0
 service-identity==26.1.0
 sqlparse==0.5.5
@@ -34,4 +36,3 @@ typing_extensions==4.15.0
 tzdata==2026.2
 ujson==5.12.1
 zope.interface==8.5
-python-dotenv==1.0.1

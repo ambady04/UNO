@@ -320,7 +320,8 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
                 'id': str(p.user.token),
                 'name': p.user.nickname,
                 'is_connected': True,
-                'called_uno': False
+                'called_uno': False,
+                'avatar_url': p.user.avatar.url if p.user.avatar else None
             })
 
         return {
@@ -368,7 +369,8 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
                                 'id': pid,
                                 'name': dp.user.nickname,
                                 'is_connected': False,
-                                'called_uno': False
+                                'called_uno': False,
+                                'avatar_url': dp.user.avatar.url if dp.user.avatar else None
                             })
 
                 # Update the current player's own connection status
@@ -385,7 +387,8 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
                         'id': str(self.user.token),
                         'name': self.user.nickname,
                         'is_connected': True,
-                        'called_uno': False
+                        'called_uno': False,
+                        'avatar_url': self.user.avatar.url if self.user.avatar else None
                     })
 
                 # Save updated status
