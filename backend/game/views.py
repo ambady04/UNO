@@ -1,5 +1,4 @@
 import random
-import string
 from rest_framework import status, views
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -9,10 +8,21 @@ from .models import GuestUser, Room, RoomPlayer, GameHistory
 from .serializers import GuestUserSerializer, RoomSerializer, GameHistorySerializer
 
 def generate_room_code():
+    LETTERS = "ACDEFGHJKLMNPQRTUVWXY"
+    DIGITS  = "2346789"
+    ALL     = LETTERS + DIGITS
     while True:
-        code = ''.join(random.choices(string.ascii_uppercase, k=6))
+        # Guarantee at least 2 letters + 2 digits; shuffle so positions are random
+        parts = (
+            random.choices(LETTERS, k=2) +
+            random.choices(DIGITS,  k=2) +
+            random.choices(ALL,     k=2)
+        )
+        random.shuffle(parts)
+        code = ''.join(parts)
         if not Room.objects.filter(code=code).exists():
             return code
+
 
 @method_decorator(csrf_exempt, name='dispatch')
 class GuestRegisterView(views.APIView):

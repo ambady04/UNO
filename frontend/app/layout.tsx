@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "UNO! Real-Time Multiplayer",
-  description: "Secure, production-grade real-time multiplayer UNO card game.",
+  description: "Real-time multiplayer UNO card game.",
   icons: {
     icon: "/uno-logo.svg",
   },
   openGraph: {
     title: "UNO! Real-Time Multiplayer",
-    description: "Secure, production-grade real-time multiplayer UNO card game.",
+    description: "Real-time multiplayer UNO card game.",
     url: "https://uno.ambady.space",
     siteName: "UNO! Multiplayer",
     images: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "UNO! Real-Time Multiplayer",
-    description: "Secure, production-grade real-time multiplayer UNO card game.",
+    description: "Real-time multiplayer UNO card game.",
     images: ["/uno-logo.svg"],
   },
 };
