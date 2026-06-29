@@ -442,7 +442,6 @@ export default function BotGamePage() {
         isPlayable(c, gs.currentColor, gs.currentValue, gs.drawPenalty, gs.hasDrawnThisTurn)
       );
       if (!hasPlayableCard) {
-        showMsg("No playable card in hand. Passing turn...");
         const timer = setTimeout(() => playerPassTurn(), 1200);
         return () => clearTimeout(timer);
       }
@@ -634,9 +633,6 @@ export default function BotGamePage() {
           <div style={{ fontSize: 48, marginBottom: 8 }}>🤖</div>
           <h1 className="lobby-title" style={{ margin: "0 0 4px 0" }}>Play vs Bot</h1>
           <p style={{ opacity: 0.6, fontSize: 14, margin: 0 }}>1v1 match against the AI</p>
-          <p style={{ opacity: 0.4, fontSize: 11, marginTop: 6, fontFamily: "monospace", letterSpacing: 2 }}>
-            ROOM: {code}
-          </p>
         </div>
         <div className="glass-panel" style={{ width: "100%", padding: 24, boxSizing: "border-box", textAlign: "center" }}>
           <p style={{ marginBottom: 20, fontSize: 14, opacity: 0.7 }}>
@@ -688,13 +684,13 @@ export default function BotGamePage() {
     <div className="uno-table">
       {/* Header */}
       <div className="game-header-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.3)", position: "absolute", top: 0, left: 0, right: 0, height: 52, zIndex: 100 }}>
-        <strong style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", flexShrink: 1 }}>
+        <strong className="game-header-logo-text" style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
           <span style={{ color: "#ffcc00ff" }}>UNO!</span>
-          <span className="hide-mobile" style={{ color: "#e41010ff" }}> Play vs Bot</span>
+          <span className="hide-mobile" style={{ color: "#e41010ff" }}> You vs Bot</span>
         </strong>
 
-        {/* Inline turn/color headers for mobile screen space saving */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, justifyContent: "center", padding: "0 4px" }}>
+        {/* Inline turn/color headers for mobile screen space saving only */}
+        <div className="mobile-header-indicators" style={{ display: "none", gap: 6, alignItems: "center", flex: 1, justifyContent: "center", padding: "0 4px" }}>
           <div style={{ padding: "4px 8px", borderRadius: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", color: isPlayerTurn ? "#ffcc00" : "#fff", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
             {isPlayerTurn ? "YOUR TURN" : "BOT'S TURN"}
           </div>

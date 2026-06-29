@@ -1479,6 +1479,10 @@ body {
   .game-header-top {
     padding: 6px 8px !important;
   }
+
+  .mobile-header-indicators {
+    display: flex !important;
+  }
 }
 
 .lobby-title {
