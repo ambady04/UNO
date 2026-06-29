@@ -691,7 +691,6 @@ export default function BotGamePage() {
         <strong style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "calc(100% - 90px)", flexShrink: 1 }}>
           <span style={{ color: "#ffcc00ff" }}>UNO!</span>
           <span className="hide-mobile" style={{ color: "#e41010ff" }}> Play vs Bot</span>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginLeft: 8, fontFamily: "monospace", letterSpacing: 1 }} className="hide-mobile">#{code}</span>
         </strong>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           <button
