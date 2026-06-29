@@ -243,13 +243,13 @@ function applyBotPlayPure(
   }
   if (cv === "Draw2") {
     next = { ...next, drawPenalty: s.drawPenalty + 2, currentTurn: "player" };
-    return [next, `Bot played ${getCardName(cc, cv)}! You must draw ${next.drawPenalty} card(s).`];
+    return [next, `Bot played ${getCardName(cc, cv)}! You must draw ${next.drawPenalty} card${next.drawPenalty !== 1 ? "s" : ""}.`];
   }
   if (cv === "WildDraw4") {
     next = { ...next, drawPenalty: s.drawPenalty + 4, currentTurn: "player" };
     return [
       next,
-      `Bot played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card(s).`,
+      `Bot played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card${next.drawPenalty !== 1 ? "s" : ""}.`,
     ];
   }
   next = { ...next, currentTurn: "player" };
@@ -524,7 +524,7 @@ export default function BotGamePage() {
             const count = s.drawPenalty;
             const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, count);
             nextState = { ...s, botHand: [...s.botHand, ...drawn], deck, discardPile: discard, drawPenalty: 0, hasDrawnThisTurn: false, currentTurn: "player" };
-            msg = `Bot drew ${count} card(s) and passed.`;
+            msg = `Bot drew ${count} card${count !== 1 ? "s" : ""} and passed.`;
           } else {
             const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, 1);
             const afterDraw = { ...s, botHand: [...s.botHand, ...drawn], deck, discardPile: discard, hasDrawnThisTurn: true, botCalledUno: false };
