@@ -1309,11 +1309,58 @@ export default function RoomPage() {
 
   return (
     <div className="game-layout">
+      <style>{`
+        .room-alert-inline {
+          color: #fff !important;
+          padding: 10px 20px !important;
+          border-radius: 12px !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          z-index: 9999 !important;
+          pointer-events: none !important;
+          animation: room-alert-life 4s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+        }
+        .room-alert-success {
+          background: rgba(40, 167, 69, 0.95) !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 15px rgba(40, 167, 69, 0.4) !important;
+        }
+        .room-alert-error {
+          background: rgba(220, 53, 69, 0.95) !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 15px rgba(220, 53, 69, 0.4) !important;
+        }
+        @keyframes room-alert-life {
+          0% {
+            transform: translate(-50%, 24px);
+            opacity: 0;
+          }
+          8% {
+            transform: translate(-50%, 0);
+            opacity: 1;
+          }
+          92% {
+            transform: translate(-50%, 0);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(-50%, 24px);
+            opacity: 0;
+          }
+        }
+      `}</style>
+
       {/* Alert Overlay */}
       {alertMessage && (
         <div
           key={alertMessage}
-          className={`game-alert ${alertType === "success" ? "alert-success" : "alert-error"}`}
+          className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
+          style={{
+            position: "fixed",
+            bottom: "210px",
+            left: "50%",
+            top: "auto",
+            zIndex: 9999,
+            whiteSpace: "nowrap"
+          }}
         >
           {alertMessage}
         </div>
