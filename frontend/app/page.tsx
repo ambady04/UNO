@@ -13,6 +13,8 @@ import {
   verifyOtp,
   updateUserProfile,
   getUserProfile,
+  checkEmail,
+  loginWithPassword,
   HistoryResponse,
 } from "./api";
 
@@ -31,7 +33,13 @@ function HomeContent() {
   // State variables
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+
+  const [emailChecked, setEmailChecked] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+  const [loginWithOtpInstead, setLoginWithOtpInstead] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [isEmailAuth, setIsEmailAuth] = useState(false);
 
@@ -85,6 +93,37 @@ function HomeContent() {
     }
   }, []);
 
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    setEmailChecked(false);
+    setEmailExists(false);
+    setHasPassword(false);
+    setOtpSent(false);
+    setLoginWithOtpInstead(false);
+    setPassword("");
+    setOtp("");
+  };
+
+  async function handleCheckEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setError("");
+    setLoading(true);
+    try {
+      const res = await checkEmail(email.trim().toLowerCase());
+      setEmailChecked(true);
+      setEmailExists(res.exists);
+      setHasPassword(res.has_password);
+      if (res.exists && res.nickname) {
+        setNickname(res.nickname);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to check email status.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!nickname.trim()) return;
@@ -132,7 +171,12 @@ function HomeContent() {
     setError("");
     setLoading(true);
     try {
-      const res = await verifyOtp(email.trim().toLowerCase(), otp.trim(), nickname.trim());
+      const res = await verifyOtp(
+        email.trim().toLowerCase(),
+        otp.trim(),
+        nickname.trim() || undefined,
+        password.trim() || undefined
+      );
       setGuest({ token: res.token, nickname: res.user.nickname });
       setNickname(res.user.nickname);
       setEditNickname(res.user.nickname);
@@ -148,6 +192,33 @@ function HomeContent() {
       }
     } catch (err: any) {
       setError(err.message || "OTP verification failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePasswordLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setError("");
+    setLoading(true);
+    try {
+      const res = await loginWithPassword(email.trim().toLowerCase(), password.trim());
+      setGuest({ token: res.token, nickname: res.user.nickname });
+      setNickname(res.user.nickname);
+      setEditNickname(res.user.nickname);
+      setProfileAvatarUrl(res.user.avatar_url);
+
+      if (redirectCode) {
+        try {
+          await joinRoom(redirectCode.toUpperCase());
+          router.push(`/room/${redirectCode.toUpperCase()}`);
+        } catch {
+          router.push(`/room/${redirectCode.toUpperCase()}`);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid password.");
     } finally {
       setLoading(false);
     }
@@ -195,6 +266,11 @@ function HomeContent() {
     setRoomCode("");
     setEmail("");
     setOtp("");
+    setPassword("");
+    setEmailChecked(false);
+    setEmailExists(false);
+    setHasPassword(false);
+    setLoginWithOtpInstead(false);
     setOtpSent(false);
     setProfileAvatarUrl(null);
   }
@@ -338,7 +414,7 @@ function HomeContent() {
                 transition: "all 0.2s"
               }}
             >
-              Login
+              Login / Register
             </button>
           </div>
 
@@ -365,77 +441,182 @@ function HomeContent() {
               </button>
             </form>
           ) : (
-            /* Email OTP Flow */
-            <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
-              <h2 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700 }}>
-                {otpSent ? "Verify Verification Code" : "Sign In / Sign Up"}
-              </h2>
-
-              {!otpSent ? (
-                <>
-                  <div style={{ marginBottom: 12 }}>
+            /* Email Auth Flow (Checking -> Password -> OTP Sign Up) */
+            <div>
+              {!emailChecked ? (
+                /* Step 1: Input Email */
+                <form onSubmit={handleCheckEmail}>
+                  <h2 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700 }}>
+                    Enter Email
+                  </h2>
+                  <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Email Address</label>
                     <input
                       type="email"
                       className="input-text"
-                      placeholder="name@example.com"
+                      placeholder="Enter email address"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => handleEmailChange(e.target.value)}
                       disabled={loading}
                       required
-                    />
-                  </div>
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Name (Optional)</label>
-                    <input
-                      type="text"
-                      className="input-text"
-                      placeholder="e.g. John Doe"
-                      value={nickname}
-                      onChange={(e) => setNickname(e.target.value)}
-                      disabled={loading}
                     />
                   </div>
                   <button type="submit" className="btn-primary" disabled={loading}>
-                    {loading ? "Sending OTP..." : "Get OTP Code"}
+                    {loading ? "Checking..." : "Continue"}
                   </button>
-                </>
-              ) : (
-                <>
-                  <div style={{ marginBottom: 12, padding: "10px 12px", background: "rgba(0, 204, 102, 0.08)", border: "1px solid rgba(0, 204, 102, 0.25)", borderRadius: 10, fontSize: 13, color: "#66ffaa" }}>
-                    📧 OTP sent to {email}. Check your console / email!
+                </form>
+              ) : emailExists && hasPassword && !loginWithOtpInstead ? (
+                /* Step 2A: Password Login */
+                <form onSubmit={handlePasswordLogin}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Welcome Back</h2>
+                    <button
+                      type="button"
+                      onClick={() => setEmailChecked(false)}
+                      style={{ background: "none", border: "none", color: "#3388ff", fontSize: 12, cursor: "pointer" }}
+                    >
+                      Change Email
+                    </button>
+                  </div>
+                  <div style={{ marginBottom: 16, fontSize: 14, opacity: 0.8 }}>
+                    Logging in as <strong>{nickname}</strong> ({email})
                   </div>
                   <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Enter 6-Digit OTP</label>
+                    <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Password</label>
                     <input
-                      type="text"
+                      type="password"
                       className="input-text"
-                      placeholder="123456"
-                      maxLength={6}
-                      style={{ textAlign: "center", letterSpacing: 6, fontWeight: 700 }}
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
+                      placeholder=""
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       disabled={loading}
                       required
                     />
                   </div>
-                  <div style={{ display: "flex", gap: 10 }}>
+                  <button type="submit" className="btn-primary" style={{ marginBottom: 12 }} disabled={loading}>
+                    {loading ? "Logging in..." : "Log In"}
+                  </button>
+                  <div style={{ textAlign: "center" }}>
                     <button
                       type="button"
-                      className="btn-secondary"
-                      style={{ flex: 1 }}
-                      onClick={() => setOtpSent(false)}
-                      disabled={loading}
+                      onClick={() => {
+                        setLoginWithOtpInstead(true);
+                        setOtpSent(false);
+                      }}
+                      style={{ background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
                     >
-                      Back
-                    </button>
-                    <button type="submit" className="btn-primary" style={{ flex: 2 }} disabled={loading}>
-                      {loading ? "Verifying..." : "Verify & Login"}
+                      Login with OTP code instead
                     </button>
                   </div>
-                </>
+                </form>
+              ) : (
+                /* Step 2B: Register (Get OTP with Nickname & Password) or Login with OTP */
+                <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                      {otpSent ? "Verify Code" : loginWithOtpInstead ? "Get Verification Code" : "Create Account"}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailChecked(false);
+                        setLoginWithOtpInstead(false);
+                      }}
+                      style={{ background: "none", border: "none", color: "#3388ff", fontSize: 12, cursor: "pointer" }}
+                    >
+                      Change Email
+                    </button>
+                  </div>
+
+                  {!otpSent ? (
+                    <>
+                      <div style={{ marginBottom: 12, fontSize: 14, opacity: 0.8 }}>
+                        Email: <strong>{email}</strong>
+                      </div>
+
+                      {!loginWithOtpInstead && (
+                        <>
+                          <div style={{ marginBottom: 12 }}>
+                            <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Display Name</label>
+                            <input
+                              type="text"
+                              className="input-text"
+                              placeholder="e.g. John Doe"
+                              value={nickname}
+                              onChange={(e) => setNickname(e.target.value)}
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                          <div style={{ marginBottom: 20 }}>
+                            <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Password</label>
+                            <input
+                              type="password"
+                              className="input-text"
+                              placeholder="Create a password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              disabled={loading}
+                              required
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <button type="submit" className="btn-primary" disabled={loading}>
+                        {loading ? "Sending..." : "Get OTP Code"}
+                      </button>
+
+                      {loginWithOtpInstead && (
+                        <div style={{ textAlign: "center", marginTop: 12 }}>
+                          <button
+                            type="button"
+                            onClick={() => setLoginWithOtpInstead(false)}
+                            style={{ background: "none", border: "none", color: "#3388ff", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}
+                          >
+                            Back to password login
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 12, padding: "10px 12px", background: "rgba(0, 204, 102, 0.08)", border: "1px solid rgba(0, 204, 102, 0.25)", borderRadius: 10, fontSize: 13, color: "#66ffaa" }}>
+                        📧 OTP sent to {email}. Check your email!
+                      </div>
+                      <div style={{ marginBottom: 20 }}>
+                        <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Enter 6-Digit OTP</label>
+                        <input
+                          type="text"
+                          className="input-text"
+                          placeholder="123456"
+                          maxLength={6}
+                          style={{ textAlign: "center", letterSpacing: 6, fontWeight: 700 }}
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value)}
+                          disabled={loading}
+                          required
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ flex: 1 }}
+                          onClick={() => setOtpSent(false)}
+                          disabled={loading}
+                        >
+                          Back
+                        </button>
+                        <button type="submit" className="btn-primary" style={{ flex: 2 }} disabled={loading}>
+                          {loading ? "Verifying..." : "Verify & Finish"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
               )}
-            </form>
+            </div>
           )}
         </div>
       ) : (
@@ -687,7 +868,7 @@ function HomeContent() {
                   position: "relative",
                   overflow: "hidden",
                   border: "3px solid #3388ff",
-                  background: "rgba(255,255,255,0.06)",
+                  background: "rgba(255, 255, 255, 0.06)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",

@@ -393,3 +393,42 @@ class OTPAndProfileTests(APITestCase):
         self.assertEqual(user.nickname, 'NewName')
         self.assertTrue(user.avatar)
 
+    def test_password_signup_and_login(self):
+        # 1. Sign up with OTP and password
+        url_send = reverse('send_otp')
+        self.client.post(url_send, {'email': 'pwd@example.com'})
+        otp_code = OTPRequest.objects.get(email='pwd@example.com').otp_code
+
+        url_verify = reverse('verify_otp')
+        res_verify = self.client.post(url_verify, {
+            'email': 'pwd@example.com',
+            'otp': otp_code,
+            'nickname': 'PwdUser',
+            'password': 'secretpassword123'
+        })
+        self.assertEqual(res_verify.status_code, status.HTTP_200_OK)
+        
+        # Check email status
+        url_check = reverse('check_email')
+        res_check = self.client.post(url_check, {'email': 'pwd@example.com'})
+        self.assertEqual(res_check.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_check.data['exists'])
+        self.assertTrue(res_check.data['has_password'])
+
+        # 2. Login with password
+        url_login = reverse('login_password')
+        res_login = self.client.post(url_login, {
+            'email': 'pwd@example.com',
+            'password': 'secretpassword123'
+        })
+        self.assertEqual(res_login.status_code, status.HTTP_200_OK)
+        self.assertIn('token', res_login.data)
+        self.assertEqual(res_login.data['user']['nickname'], 'PwdUser')
+
+        # 3. Invalid password login
+        res_invalid = self.client.post(url_login, {
+            'email': 'pwd@example.com',
+            'password': 'wrongpassword'
+        })
+        self.assertEqual(res_invalid.status_code, status.HTTP_400_BAD_REQUEST)
+

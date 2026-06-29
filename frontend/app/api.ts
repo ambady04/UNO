@@ -140,11 +140,44 @@ export async function sendOtp(email: string): Promise<{ message: string }> {
   return res.json();
 }
 
-export async function verifyOtp(email: string, otp: string, nickname?: string): Promise<{ token: string; user: ProfileResponse }> {
+export async function checkEmail(email: string): Promise<{ exists: boolean; has_password: boolean; nickname?: string }> {
+  const res = await fetch(`${BASE_URL}/api/auth/check-email/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to check email.');
+  }
+  return res.json();
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<{ token: string; user: ProfileResponse }> {
+  const res = await fetch(`${BASE_URL}/api/auth/login-password/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to login with password.');
+  }
+  const data = await res.json();
+  setStoredGuest(data.token, data.user.nickname);
+  if (data.user.avatar_url) {
+    localStorage.setItem('uno_guest_avatar', data.user.avatar_url);
+  } else {
+    localStorage.removeItem('uno_guest_avatar');
+  }
+  return data;
+}
+
+export async function verifyOtp(email: string, otp: string, nickname?: string, password?: string): Promise<{ token: string; user: ProfileResponse }> {
   const res = await fetch(`${BASE_URL}/api/auth/verify-otp/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, otp, nickname }),
+    body: JSON.stringify({ email, otp, nickname, password }),
   });
   if (!res.ok) {
     const err = await res.json();
