@@ -1434,54 +1434,50 @@ body {
     box-shadow: 0 0 10px rgba(255, 51, 51, 1);
   }
 }
-
 /* Mobile responsive squeeze rules */
 @media (max-width: 767px) {
-  /* Let's hide standard opponents zones on mobile entirely */
-  .opponents-top {
-    display: none;
+  .uno-table {
+    padding: 0px !important;
   }
 
-  /* Compact layout optimizations */
-  .uno-table {
-    padding: 0;
+  .opponents-top {
+    margin-top: 56px !important;
+    padding: 4px !important;
   }
 
   .table-felt {
-    border: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    flex: 1;
-    max-height: none; /* Let table-felt auto-expand to fill vertical space */
-    gap: 12px;
+    border-radius: 16px !important;
+    margin: 8px !important;
+    flex: 1 !important;
+    max-height: none !important;
+    gap: 8px !important;
+    padding: 8px !important;
   }
 
   .pile-container {
-    gap: 12px;
-    padding: 10px 16px;
-    border-radius: 16px;
+    gap: 12px !important;
+    padding: 8px 16px !important;
+    border-radius: 12px !important;
   }
 
   .hand-wrapper {
-    padding: 6px 4px 8px 4px;
+    padding: 6px 4px 8px 4px !important;
   }
 
   .hand-container {
-    align-items: flex-end;
-    height: 170px;
-    padding: 0 12px 7px 12px;
-    scroll-snap-type: x mandatory;
-  }
-
-  .hand-card-wrapper {
-    scroll-snap-align: center;
+    align-items: flex-end !important;
+    height: 150px !important;
+    padding: 0 12px 7px 12px !important;
   }
 
   .btn-uno-shout {
-    width: 60px;
-    height: 60px;
-    font-size: 14px;
-    border-width: 3px;
+    width: 54px !important;
+    height: 54px !important;
+    font-size: 13px !important;
+  }
+
+  .game-header-top {
+    padding: 6px 8px !important;
   }
 }
 

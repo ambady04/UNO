@@ -687,16 +687,35 @@ export default function BotGamePage() {
   return (
     <div className="uno-table">
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.3)", position: "absolute", top: 0, left: 0, right: 0, height: 52, zIndex: 50 }}>
-        <strong style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "calc(100% - 90px)", flexShrink: 1 }}>
+      <div className="game-header-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.3)", position: "absolute", top: 0, left: 0, right: 0, height: 52, zIndex: 100 }}>
+        <strong style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", flexShrink: 1 }}>
           <span style={{ color: "#ffcc00ff" }}>UNO!</span>
           <span className="hide-mobile" style={{ color: "#e41010ff" }}> Play vs Bot</span>
         </strong>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+
+        {/* Inline turn/color headers for mobile screen space saving */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, justifyContent: "center", padding: "0 4px" }}>
+          <div style={{ padding: "4px 8px", borderRadius: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", color: isPlayerTurn ? "#ffcc00" : "#fff", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {isPlayerTurn ? "YOUR TURN" : "BOT'S TURN"}
+          </div>
+          <div style={{
+            background: gs.currentColor === "R" ? "var(--color-red)" : gs.currentColor === "Y" ? "var(--color-yellow)" : gs.currentColor === "G" ? "var(--color-green)" : gs.currentColor === "B" ? "var(--color-blue)" : "#333",
+            color: gs.currentColor === "Y" ? "#000" : "#fff",
+            fontWeight: 800,
+            padding: "4px 8px",
+            fontSize: 10,
+            borderRadius: 8,
+            whiteSpace: "nowrap"
+          }}>
+            {gs.currentColor === "R" ? "Red" : gs.currentColor === "Y" ? "Yellow" : gs.currentColor === "G" ? "Green" : gs.currentColor === "B" ? "Blue" : "None"}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
           <button
             onClick={() => { const m = !isMuted; setIsMuted(m); gameSounds.setMute(m); }}
             className="btn-secondary"
-            style={{ padding: "4px 8px", fontSize: 15, minHeight: 30, minWidth: 34, lineHeight: 1 }}
+            style={{ padding: "4px 8px", fontSize: 14, minHeight: 30, minWidth: 34, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             {isMuted ? "🔇" : "🔊"}
           </button>
@@ -706,10 +725,10 @@ export default function BotGamePage() {
         </div>
       </div>
 
-      {/* Toast stack */}
-      <div style={{ position: "fixed", bottom: "210px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 300, pointerEvents: "none" }}>
+      {/* Toast stack — positioned dynamically and prevents clipping */}
+      <div style={{ position: "fixed", bottom: "210px", left: "16px", right: "16px", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 300, pointerEvents: "none" }}>
         {toasts.map((t) => (
-          <div key={t.id} className="game-alert alert-success" style={{ position: "relative", bottom: "auto", left: "auto", transform: "none", whiteSpace: "nowrap", fontSize: 13 }}>
+          <div key={t.id} className="game-alert alert-success" style={{ position: "relative", bottom: "auto", left: "auto", transform: "none", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, maxWidth: "100%", padding: "8px 16px" }}>
             {t.text}
           </div>
         ))}
@@ -736,9 +755,9 @@ export default function BotGamePage() {
       </div>
 
       {/* Felt Table */}
-      <div className="table-felt">
-        {/* Turn & Color */}
-        <div className="table-header-row" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", zIndex: 30 }}>
+      <div className="table-felt" style={{ marginTop: "52px" }}>
+        {/* Turn & Color (Hidden on mobile since they are now in the top header) */}
+        <div className="table-header-row hide-mobile" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", zIndex: 30 }}>
           <div style={{ padding: "5px 12px", borderRadius: 12, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", color: isPlayerTurn ? "#ffcc00" : "#fff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
             {isPlayerTurn ? "👉 YOUR TURN 👈" : "🤖 BOT'S TURN"}
           </div>
