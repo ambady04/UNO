@@ -3,7 +3,7 @@ import time
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
-from .models import Room, RoomPlayer, GuestUser, GameHistory
+from .models import Room, RoomPlayer, GuestUser
 from .state_manager import GameStateManager, VersionMismatchError
 from . import game_logic
 
@@ -283,22 +283,9 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
                     winner_id = pid
                     break
 
-            if winner_id:
-                try:
-                    winner_user = GuestUser.objects.get(token=winner_id)
-                    winner_name = winner_user.nickname
-                except GuestUser.DoesNotExist:
-                    pass
-
-            duration = int(time.time() - room.created_at.timestamp())
-            GameHistory.objects.create(
-                room_code=self.room_code,
-                winner_id=winner_id,
-                winner_name=winner_name,
-                duration_seconds=max(0, duration)
-            )
         except Exception as e:
-            print("Error saving game history:", e)
+            print("Error finalizing game in db:", e)
+
 
     def delete_room_player_sync(self, target_id, is_leave=False):
         room = Room.objects.get(code=self.room_code)

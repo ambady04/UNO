@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import GuestUser, Room, RoomPlayer, GameHistory
+from .models import GuestUser, Room, RoomPlayer
 
 class GuestUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,7 +23,3 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = ['code', 'status', 'host_id', 'host_nickname', 'players', 'created_at']
 
-class GameHistorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = GameHistory
-        fields = ['room_code', 'winner_name', 'duration_seconds', 'played_at']
