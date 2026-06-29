@@ -4,8 +4,15 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from .models import GuestUser, Room, RoomPlayer, GameHistory
-from .serializers import GuestUserSerializer, RoomSerializer, GameHistorySerializer
+from datetime import timedelta
+from django.utils import timezone
+from .models import GuestUser, Room, RoomPlayer
+from .serializers import GuestUserSerializer, RoomSerializer
+
+def clean_old_rooms_helper():
+    """Deletes rooms that were created more than 2 hours ago."""
+    threshold = timezone.now() - timedelta(hours=2)
+    Room.objects.filter(created_at__lt=threshold).delete()
 
 def generate_room_code():
     LETTERS = "ACDEFGHJKLMNPQRTUVWXY"
@@ -45,6 +52,7 @@ class RoomCreateView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        clean_old_rooms_helper()
         code = generate_room_code()
         room = Room.objects.create(code=code, host=request.user, status='LOBBY')
         RoomPlayer.objects.create(room=room, user=request.user, slot_index=0)
@@ -57,6 +65,7 @@ class RoomJoinView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, code):
+        clean_old_rooms_helper()
         code = code.upper()
         try:
             room = Room.objects.get(code=code)
@@ -89,6 +98,7 @@ class RoomDetailView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, code):
+        clean_old_rooms_helper()
         code = code.upper()
         try:
             room = Room.objects.get(code=code)
@@ -98,11 +108,3 @@ class RoomDetailView(views.APIView):
         serializer = RoomSerializer(room)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class GameHistoryListView(views.APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    def get(self, request):
-        histories = GameHistory.objects.all().order_by('-played_at')[:10]
-        serializer = GameHistorySerializer(histories, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)

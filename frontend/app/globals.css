@@ -1040,11 +1040,6 @@ body {
 
 /* Alert/Notifications */
 .game-alert {
-  position: fixed;
-  bottom: 210px;
-  left: 50%;
-  transform: translateX(-50%);
-  top: auto;
   color: #fff;
   padding: 10px 20px;
   border-radius: 12px;
@@ -1052,9 +1047,55 @@ body {
   font-weight: 600;
   z-index: 300;
   pointer-events: none;
-  white-space: nowrap;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   animation: alert-life 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.toast-container-responsive {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 100;
+  pointer-events: none;
+  width: 100%;
+  max-width: 320px;
+}
+
+.bot-toast-msg {
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 300;
+  pointer-events: none;
+  background: rgba(40, 167, 69, 0.95);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 15px rgba(40, 167, 69, 0.4);
+  animation: toast-life 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes toast-life {
+  0% {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  8% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  92% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(24px);
+    opacity: 0;
+  }
 }
 
 .alert-error {
@@ -1449,7 +1490,7 @@ body {
     border-radius: 16px !important;
     margin: 8px !important;
     flex: 1 !important;
-    max-height: none !important;
+    max-height: 48vh !important;
     gap: 8px !important;
     padding: 8px !important;
   }

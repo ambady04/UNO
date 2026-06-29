@@ -243,13 +243,13 @@ function applyBotPlayPure(
   }
   if (cv === "Draw2") {
     next = { ...next, drawPenalty: s.drawPenalty + 2, currentTurn: "player" };
-    return [next, `Bot played ${getCardName(cc, cv)}! You must draw ${next.drawPenalty} card(s).`];
+    return [next, `Bot played ${getCardName(cc, cv)}! You must draw ${next.drawPenalty} card${next.drawPenalty !== 1 ? "s" : ""}.`];
   }
   if (cv === "WildDraw4") {
     next = { ...next, drawPenalty: s.drawPenalty + 4, currentTurn: "player" };
     return [
       next,
-      `Bot played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card(s).`,
+      `Bot played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Draw ${next.drawPenalty} card${next.drawPenalty !== 1 ? "s" : ""}.`,
     ];
   }
   next = { ...next, currentTurn: "player" };
@@ -442,7 +442,6 @@ export default function BotGamePage() {
         isPlayable(c, gs.currentColor, gs.currentValue, gs.drawPenalty, gs.hasDrawnThisTurn)
       );
       if (!hasPlayableCard) {
-        showMsg("No playable card in hand. Passing turn...");
         const timer = setTimeout(() => playerPassTurn(), 1200);
         return () => clearTimeout(timer);
       }
@@ -525,7 +524,7 @@ export default function BotGamePage() {
             const count = s.drawPenalty;
             const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, count);
             nextState = { ...s, botHand: [...s.botHand, ...drawn], deck, discardPile: discard, drawPenalty: 0, hasDrawnThisTurn: false, currentTurn: "player" };
-            msg = `Bot drew ${count} card(s) and passed.`;
+            msg = `Bot drew ${count} card${count !== 1 ? "s" : ""} and passed.`;
           } else {
             const { drawn, deck, discard } = drawCards(s.deck, s.discardPile, 1);
             const afterDraw = { ...s, botHand: [...s.botHand, ...drawn], deck, discardPile: discard, hasDrawnThisTurn: true, botCalledUno: false };
@@ -579,29 +578,22 @@ export default function BotGamePage() {
 
     if (playerHand.length === 0) { setGs({ ...base, gameStatus: "FINISHED", winner: "player" }); return; }
 
-    let next = base;
-    let msg = "";
+    let next: BotGameState;
     if (cv === "Skip") {
       next = { ...base, currentTurn: "player" };
-      msg = `${nickname} played ${getCardName(cc, cv)} — bot's turn skipped!`;
     } else if (cv === "Reverse") {
       next = { ...base, currentTurn: "player" };
-      msg = `${nickname} played ${getCardName(cc, cv)} — acts as Skip in 1v1!`;
     } else if (cv === "Draw2") {
       const penalty = gs.drawPenalty + 2;
       next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
-      msg = `${nickname} played ${getCardName(cc, cv)}! Bot must draw ${penalty} card(s).`;
     } else if (cv === "WildDraw4") {
       const penalty = gs.drawPenalty + 4;
       next = { ...base, drawPenalty: penalty, currentTurn: "bot" };
-      msg = `${nickname} played ${getCardName(cc, cv)}! Color → ${COLOR_LABEL[color]}. Bot must draw ${penalty} card(s).`;
     } else {
       next = { ...base, currentTurn: "bot" };
-      msg = `${nickname} played ${getCardName(cc, cv)}.`;
     }
 
     setGs(next);
-    if (msg) showMsg(msg);
   }
 
   function playerDrawCard() {
@@ -609,7 +601,6 @@ export default function BotGamePage() {
     if (gs.hasDrawnThisTurn && gs.drawPenalty === 0) { showMsg("You already drew. Play a card or pass."); return; }
     const count = gs.drawPenalty > 0 ? gs.drawPenalty : 1;
     const { drawn, deck, discard } = drawCards(gs.deck, gs.discardPile, count);
-    showMsg(gs.drawPenalty > 0 ? `You drew ${count} card(s) as penalty.` : `You drew a card.`);
     setGs({ ...gs, playerHand: [...gs.playerHand, ...drawn], deck, discardPile: discard, drawPenalty: 0, hasDrawnThisTurn: gs.drawPenalty === 0, playerCalledUno: false, currentTurn: gs.drawPenalty > 0 ? "bot" : gs.currentTurn });
   }
 
@@ -617,7 +608,6 @@ export default function BotGamePage() {
     if (!gs || gs.currentTurn !== "player" || gs.gameStatus !== "PLAYING") return;
     if (!gs.hasDrawnThisTurn) { showMsg("Draw a card first before passing."); return; }
     setGs({ ...gs, hasDrawnThisTurn: false, currentTurn: "bot" });
-    showMsg("You passed. Bot's turn.");
   }
 
   function callUno() {
@@ -634,9 +624,6 @@ export default function BotGamePage() {
           <div style={{ fontSize: 48, marginBottom: 8 }}>🤖</div>
           <h1 className="lobby-title" style={{ margin: "0 0 4px 0" }}>Play vs Bot</h1>
           <p style={{ opacity: 0.6, fontSize: 14, margin: 0 }}>1v1 match against the AI</p>
-          <p style={{ opacity: 0.4, fontSize: 11, marginTop: 6, fontFamily: "monospace", letterSpacing: 2 }}>
-            ROOM: {code}
-          </p>
         </div>
         <div className="glass-panel" style={{ width: "100%", padding: 24, boxSizing: "border-box", textAlign: "center" }}>
           <p style={{ marginBottom: 20, fontSize: 14, opacity: 0.7 }}>
@@ -688,51 +675,25 @@ export default function BotGamePage() {
     <div className="uno-table">
       {/* Header */}
       <div className="game-header-top" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.3)", position: "absolute", top: 0, left: 0, right: 0, height: 52, zIndex: 100 }}>
-        <strong style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", flexShrink: 1 }}>
+        <strong className="game-header-logo-text" style={{ fontSize: 14, letterSpacing: 0.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 1 }}>
           <span style={{ color: "#ffcc00ff" }}>UNO!</span>
-          <span className="hide-mobile" style={{ color: "#e41010ff" }}> Play vs Bot</span>
+          <span className="hide-mobile" style={{ color: "#e41010ff" }}> You vs Bot</span>
         </strong>
-
-        {/* Inline turn/color headers for mobile screen space saving */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, justifyContent: "center", padding: "0 4px" }}>
-          <div style={{ padding: "4px 8px", borderRadius: 8, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", color: isPlayerTurn ? "#ffcc00" : "#fff", fontSize: 10, fontWeight: 700, whiteSpace: "nowrap" }}>
-            {isPlayerTurn ? "YOUR TURN" : "BOT'S TURN"}
-          </div>
-          <div style={{
-            background: gs.currentColor === "R" ? "var(--color-red)" : gs.currentColor === "Y" ? "var(--color-yellow)" : gs.currentColor === "G" ? "var(--color-green)" : gs.currentColor === "B" ? "var(--color-blue)" : "#333",
-            color: gs.currentColor === "Y" ? "#000" : "#fff",
-            fontWeight: 800,
-            padding: "4px 8px",
-            fontSize: 10,
-            borderRadius: 8,
-            whiteSpace: "nowrap"
-          }}>
-            {gs.currentColor === "R" ? "Red" : gs.currentColor === "Y" ? "Yellow" : gs.currentColor === "G" ? "Green" : gs.currentColor === "B" ? "Blue" : "None"}
-          </div>
-        </div>
 
         <div style={{ display: "flex", gap: 6, flexShrink: 0, alignItems: "center" }}>
           <button
             onClick={() => { const m = !isMuted; setIsMuted(m); gameSounds.setMute(m); }}
             className="btn-secondary"
-            style={{ padding: "4px 8px", fontSize: 14, minHeight: 30, minWidth: 34, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+            style={{ padding: "6px 10px", fontSize: 16, minHeight: 34, minWidth: 38, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             {isMuted ? "🔇" : "🔊"}
           </button>
-          <button onClick={handleExit} className="btn-secondary" style={{ padding: "4px 10px", fontSize: 12, minHeight: 30, borderColor: "rgba(255,51,51,0.3)", color: "#ff5555" }}>
+          <button onClick={handleExit} className="btn-secondary" style={{ padding: "6px 14px", fontSize: 14, minHeight: 34, borderColor: "rgba(255,51,51,0.3)", color: "#ff5555", fontWeight: 700 }}>
             Exit
           </button>
         </div>
       </div>
 
-      {/* Toast stack — positioned dynamically and prevents clipping */}
-      <div style={{ position: "fixed", bottom: "210px", left: "16px", right: "16px", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 300, pointerEvents: "none" }}>
-        {toasts.map((t) => (
-          <div key={t.id} className="game-alert alert-success" style={{ position: "relative", bottom: "auto", left: "auto", transform: "none", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, maxWidth: "100%", padding: "8px 16px" }}>
-            {t.text}
-          </div>
-        ))}
-      </div>
 
       {/* Bot Avatar */}
       <div className="opponents-top" style={{ marginTop: 52 }}>
@@ -796,6 +757,39 @@ export default function BotGamePage() {
           </div>
         )}
 
+        <style>{`
+          .bot-toast-msg-inline {
+            color: #fff !important;
+            padding: 10px 20px !important;
+            border-radius: 12px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            z-index: 300 !important;
+            pointer-events: none !important;
+            background: rgba(40, 167, 69, 0.95) !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 15px rgba(40, 167, 69, 0.4) !important;
+            animation: toast-life-inline 4s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+          }
+          @keyframes toast-life-inline {
+            0% {
+              transform: translateY(24px);
+              opacity: 0;
+            }
+            8% {
+              transform: translateY(0);
+              opacity: 1;
+            }
+            92% {
+              transform: translateY(0);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(24px);
+              opacity: 0;
+            }
+          }
+        `}</style>
+
         {/* Action buttons */}
         <div className="table-action-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, zIndex: 30 }}>
           <button onClick={callUno} className="btn-uno-shout" disabled={!(gs.playerHand.length === 1 && !gs.playerCalledUno)}>UNO</button>
@@ -803,6 +797,15 @@ export default function BotGamePage() {
             <button onClick={playerPassTurn} className="btn-primary" style={{ background: "#00cc66", color: "#fff", minHeight: 44, padding: "0 20px", width: "auto", borderRadius: 12, fontSize: 14, fontWeight: 800, boxShadow: "0 0 12px rgba(0,204,102,0.4)", letterSpacing: 0.5 }}>✓ Pass</button>
           )}
         </div>
+      </div>
+
+      {/* Toast stack — positioned in the center black space between felt table and player hand */}
+      <div style={{ position: "absolute", bottom: "210px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 9999, pointerEvents: "none", width: "100%", maxWidth: "280px" }}>
+        {toasts.slice(-1).map((t) => (
+          <div key={t.id} className="bot-toast-msg-inline" style={{ position: "relative", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
+            {t.text}
+          </div>
+        ))}
       </div>
 
       {/* Player Hand */}

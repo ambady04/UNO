@@ -45,12 +45,4 @@ class RoomPlayer(models.Model):
     def __str__(self):
         return f"{self.user.nickname} in {self.room.code}"
 
-class GameHistory(models.Model):
-    room_code = models.CharField(max_length=6)
-    winner = models.ForeignKey(GuestUser, on_delete=models.SET_NULL, null=True, blank=True)
-    winner_name = models.CharField(max_length=50)
-    duration_seconds = models.IntegerField(default=0)
-    played_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"History of {self.room_code} won by {self.winner_name}"

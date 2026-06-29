@@ -7,7 +7,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import GuestUser, Room, RoomPlayer, GameHistory
+from .models import GuestUser, Room, RoomPlayer
 from .state_manager import GameStateManager, VersionMismatchError
 from . import game_logic
 
