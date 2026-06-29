@@ -1330,41 +1330,23 @@ export default function RoomPage() {
         }
         @keyframes room-alert-life {
           0% {
-            transform: translate(-50%, 24px);
+            transform: translateY(24px);
             opacity: 0;
           }
           8% {
-            transform: translate(-50%, 0);
+            transform: translateY(0);
             opacity: 1;
           }
           92% {
-            transform: translate(-50%, 0);
+            transform: translateY(0);
             opacity: 1;
           }
           100% {
-            transform: translate(-50%, 24px);
+            transform: translateY(24px);
             opacity: 0;
           }
         }
       `}</style>
-
-      {/* Alert Overlay */}
-      {alertMessage && (
-        <div
-          key={alertMessage}
-          className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
-          style={{
-            position: "fixed",
-            bottom: "210px",
-            left: "50%",
-            top: "auto",
-            zIndex: 9999,
-            whiteSpace: "nowrap"
-          }}
-        >
-          {alertMessage}
-        </div>
-      )}
 
       {/* Top Header Row / Room Status */}
       {gameState?.game_status !== "LOBBY" && (
@@ -1970,6 +1952,8 @@ export default function RoomPage() {
                 </div>
               )}
 
+
+
             {/* Action buttons on the table felt */}
             <div
               className="table-action-row"
@@ -2182,6 +2166,39 @@ export default function RoomPage() {
           <div className="opponents-right">
             {rightOpponents.map(renderOpponentAvatar)}
           </div>
+
+          {/* Alert Overlay — positioned in the center black space between felt table and player hand */}
+          {alertMessage && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "210px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 9999,
+                pointerEvents: "none",
+                width: "100%",
+                maxWidth: "280px",
+                display: "flex",
+                justifyContent: "center"
+              }}
+            >
+              <div
+                key={alertMessage}
+                className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
+                style={{
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                  fontSize: 12,
+                  width: "100%",
+                  boxSizing: "border-box"
+                }}
+              >
+                {alertMessage}
+              </div>
+            </div>
+          )}
 
           {/* Bottom Player Hand & Info */}
           <div className="player-bottom-panel">

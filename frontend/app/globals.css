@@ -1051,6 +1051,21 @@ body {
   animation: alert-life 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
+.toast-container-responsive {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 100;
+  pointer-events: none;
+  width: 100%;
+  max-width: 320px;
+}
+
 .bot-toast-msg {
   color: #fff;
   padding: 10px 20px;

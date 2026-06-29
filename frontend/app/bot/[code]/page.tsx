@@ -790,15 +790,6 @@ export default function BotGamePage() {
           }
         `}</style>
 
-        {/* Toast stack — centered absolutely inside the felt table directly above the action buttons */}
-        <div style={{ position: "absolute", bottom: "76px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 100, pointerEvents: "none", width: "100%", maxWidth: "280px" }}>
-          {toasts.map((t) => (
-            <div key={t.id} className="bot-toast-msg-inline" style={{ position: "relative", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
-              {t.text}
-            </div>
-          ))}
-        </div>
-
         {/* Action buttons */}
         <div className="table-action-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, zIndex: 30 }}>
           <button onClick={callUno} className="btn-uno-shout" disabled={!(gs.playerHand.length === 1 && !gs.playerCalledUno)}>UNO</button>
@@ -806,6 +797,15 @@ export default function BotGamePage() {
             <button onClick={playerPassTurn} className="btn-primary" style={{ background: "#00cc66", color: "#fff", minHeight: 44, padding: "0 20px", width: "auto", borderRadius: 12, fontSize: 14, fontWeight: 800, boxShadow: "0 0 12px rgba(0,204,102,0.4)", letterSpacing: 0.5 }}>✓ Pass</button>
           )}
         </div>
+      </div>
+
+      {/* Toast stack — positioned in the center black space between felt table and player hand */}
+      <div style={{ position: "absolute", bottom: "210px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 9999, pointerEvents: "none", width: "100%", maxWidth: "280px" }}>
+        {toasts.slice(-1).map((t) => (
+          <div key={t.id} className="bot-toast-msg-inline" style={{ position: "relative", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
+            {t.text}
+          </div>
+        ))}
       </div>
 
       {/* Player Hand */}
