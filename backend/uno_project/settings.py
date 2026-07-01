@@ -136,11 +136,11 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'games.ambady.space@gmail.com'
-EMAIL_HOST_PASSWORD = 'yjab dxle kzlf gyor'
-DEFAULT_FROM_EMAIL = '"UNO! Multiplayer" <games.ambady.space@gmail.com>'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'games.ambady.space@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'yjab dxle kzlf gyor')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', '"UNO! Multiplayer" <games.ambady.space@gmail.com>')
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
