@@ -488,7 +488,7 @@ export default function RoomPage() {
             : null;
         if (msg.sender_id !== myToken) {
           if (msg.message.startsWith("🔊 ")) {
-            const soundKey = msg.message.slice(2);
+            const soundKey = msg.message.replace("🔊 ", "");
             const option = QUICK_CHAT_OPTIONS.find((opt) => opt.label === soundKey);
             if (option && !gameSounds.getMute()) {
               const audio = new Audio(`https://www.myinstants.com/media/sounds/${option.sound}.mp3`);
@@ -2198,7 +2198,7 @@ export default function RoomPage() {
                           fontWeight: 400,
                         }}
                       >
-                        {preview.message.startsWith("🔊 ") ? preview.message.slice(2) : preview.message}
+                        {preview.message.startsWith("🔊 ") ? preview.message.replace("🔊 ", "") : preview.message}
                       </div>
                       {/* Small arrow down pointing to chat icon - only on the bottom-most preview */}
                       {index === activePreviews.length - 1 && (
@@ -2586,7 +2586,7 @@ export default function RoomPage() {
                 >
                   {msg.sender_name}
                 </div>
-                <div>{msg.message.startsWith("🔊 ") ? msg.message.slice(2) : msg.message}</div>
+                <div>{msg.message.startsWith("🔊 ") ? msg.message.replace("🔊 ", "") : msg.message}</div>
               </div>
             ))
           )}

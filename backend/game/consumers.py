@@ -215,7 +215,13 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
             if not p.get('is_connected', False):
                 raise ValueError(f"Cannot start match. Player '{p['name']}' is offline.")
 
-        players_data = [{"id": str(p.user.token), "name": p.user.nickname} for p in db_players]
+        players_data = [
+            {
+                "id": str(p.user.token),
+                "name": p.user.nickname,
+                "avatar_url": p.user.avatar.url if p.user.avatar else None
+            } for p in db_players
+        ]
         
         # Initialize game state
         lobby_version = state.get('version', 0)
@@ -248,7 +254,8 @@ class UnoConsumer(AsyncJsonWebsocketConsumer):
                 'id': str(p.user.token),
                 'name': p.user.nickname,
                 'is_connected': True,
-                'called_uno': False
+                'called_uno': False,
+                'avatar_url': p.user.avatar.url if p.user.avatar else None
             })
 
         # Reset Room status in PostgreSQL
