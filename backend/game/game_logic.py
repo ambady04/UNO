@@ -118,7 +118,7 @@ def draw_cards_for_player(state, player_id, count):
 def initialize_game(players):
     """
     Initializes a new game state for the room.
-    players: list of dicts {"id": str, "name": str}
+    players: list of dicts {"id": str, "name": str, "avatar_url": str/None}
     """
     deck = create_initial_deck()
     random.shuffle(deck)
@@ -131,7 +131,8 @@ def initialize_game(players):
             'id': p['id'],
             'name': p['name'],
             'is_connected': True,
-            'called_uno': False
+            'called_uno': False,
+            'avatar_url': p.get('avatar_url')
         })
         
     state = {
