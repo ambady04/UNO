@@ -125,7 +125,7 @@ class RoomDetailView(views.APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from .models import OTPRequest
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -146,117 +146,63 @@ class SendOTPView(views.APIView):
         # Create OTP Request
         OTPRequest.objects.create(email=email, otp_code=code, expires_at=expires_at)
         
-        # HTML Email Message
+        # Plain text version
+        text_message = (
+            f"Hello,\n\n"
+            f"Use the verification code below to log in or register your UNO! Multiplayer account:\n\n"
+            f"{code}\n\n"
+            f"This code will expire in 5 minutes. If you did not request this code, you can safely ignore this email.\n\n"
+            f"Played with love by Ambady (https://ambady.space)\n"
+            f"© 2026 UNO! Multiplayer. All rights reserved."
+        )
+
+        # HTML Email Message using inline styles to improve deliverability and prevent spam filtering
         html_message = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <title>Your UNO! Verification Code</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background-color: #0f172a;
-                    color: #f8fafc;
-                    margin: 0;
-                    padding: 0;
-                    -webkit-font-smoothing: antialiased;
-                }}
-                .email-container {{
-                    max-width: 500px;
-                    margin: 40px auto;
-                    background: #1e293b;
-                    border: 1px solid #334155;
-                    border-radius: 16px;
-                    padding: 32px;
-                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-                    text-align: center;
-                }}
-                .header {{
-                    margin-bottom: 24px;
-                }}
-                .header h1 {{
-                    color: #ffcc00;
-                    font-size: 24px;
-                    font-weight: 800;
-                    letter-spacing: 1px;
-                    margin: 0;
-                }}
-                .content {{
-                    line-height: 1.6;
-                    font-size: 15px;
-                    color: #cbd5e1;
-                    text-align: left;
-                }}
-                .content p {{
-                    margin: 0 0 16px 0;
-                }}
-                .otp-box {{
-                    background: #0f172a;
-                    border: 1.5px dashed #3388ff;
-                    border-radius: 12px;
-                    padding: 18px;
-                    text-align: center;
-                    margin: 24px 0;
-                }}
-                .otp-code {{
-                    font-family: 'Courier New', Courier, monospace;
-                    font-size: 34px;
-                    font-weight: 800;
-                    letter-spacing: 6px;
-                    color: #38bdf8;
-                    margin: 0;
-                    padding-left: 6px;
-                }}
-                .footer {{
-                    margin-top: 32px;
-                    border-top: 1px solid #334155;
-                    padding-top: 20px;
-                    font-size: 11px;
-                    color: #64748b;
-                    text-align: center;
-                }}
-                .footer a {{
-                    color: #38bdf8;
-                    text-decoration: none;
-                    font-weight: 600;
-                }}
-            </style>
         </head>
-        <body>
-            <div class="email-container">
-                <div class="header">
-                    <h1>🃏 UNO! MULTIPLAYER</h1>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased;">
+            <div style="max-width: 500px; margin: 20px auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); text-align: center;">
+                <div style="margin-bottom: 24px;">
+                    <h1 style="color: #e11d48; font-size: 24px; font-weight: 800; letter-spacing: 0.5px; margin: 0; text-transform: uppercase;">UNO! MULTIPLAYER</h1>
                 </div>
-                <div class="content">
-                    <p>Hello,</p>
-                    <p>Use the verification code below to log in or register your <strong>UNO! Multiplayer</strong> account:</p>
+                <div style="line-height: 1.6; font-size: 15px; color: #334155; text-align: left;">
+                    <p style="margin: 0 0 16px 0;">Hello,</p>
+                    <p style="margin: 0 0 16px 0;">Use the verification code below to log in or register your <strong>UNO! Multiplayer</strong> account:</p>
                     
-                    <div class="otp-box">
-                        <div class="otp-code">{code}</div>
+                    <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 18px; text-align: center; margin: 24px 0;">
+                        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #0f172a; padding-left: 6px;">{code}</span>
                     </div>
                     
-                    <p>This code will expire in <strong>5 minutes</strong>. If you did not request this code, you can safely ignore this email.</p>
+                    <p style="margin: 0 0 16px 0; font-size: 14px; color: #64748b;">This code will expire in <strong>5 minutes</strong>. If you did not request this code, you can safely ignore this email.</p>
                 </div>
-                <div class="footer">
-                    <p>Played with ❤️ by <a href="https://ambady.space" target="_blank">Ambady</a></p>
-                    <p>&copy; 2026 UNO! Multiplayer. All rights reserved.</p>
+                <div style="margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 11px; color: #94a3b8; text-align: center;">
+                    <p style="margin: 0 0 8px 0;">Played with ❤️ by <a href="https://ambady.space" target="_blank" style="color: #3b82f6; text-decoration: none; font-weight: 600;">Ambady</a></p>
+                    <p style="margin: 0;">&copy; 2026 UNO! Multiplayer. All rights reserved.</p>
                 </div>
             </div>
         </body>
         </html>
         """
 
-        # Send Email
+        # Send Email using EmailMultiAlternatives with anti-spam headers
         try:
-            send_mail(
+            msg = EmailMultiAlternatives(
                 subject="Your UNO! Verification Code",
-                message=f"Your verification code is: {code}\nThis code will expire in 5 minutes.",
+                body=text_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-                html_message=html_message
+                to=[email],
+                reply_to=[settings.DEFAULT_FROM_EMAIL],
+                headers={
+                    'Auto-Submitted': 'auto-generated',
+                    'X-Auto-Response-Suppress': 'All',
+                }
             )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send(fail_silently=False)
         except Exception as e:
             return Response({'error': f'Failed to send email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
