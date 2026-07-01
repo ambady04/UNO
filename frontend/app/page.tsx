@@ -80,6 +80,22 @@ function compressImage(file: File, maxWidth: number = 256, maxHeight: number = 2
   });
 }
 
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const EyeOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+    <path d="M6.61 6.61A13.52 13.52 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+    <line x1="2" x2="22" y1="2" y2="22"/>
+  </svg>
+);
+
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -89,6 +105,7 @@ function HomeContent() {
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
 
   const [emailChecked, setEmailChecked] = useState(false);
@@ -209,6 +226,20 @@ function HomeContent() {
     e.preventDefault();
     if (!email.trim()) return;
     setError("");
+
+    if (!loginWithOtpInstead) {
+      const lengthValid = password.length >= 8;
+      const upperValid = /[A-Z]/.test(password);
+      const lowerValid = /[a-z]/.test(password);
+      const digitValid = /[0-9]/.test(password);
+      const specialValid = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+      
+      if (!lengthValid || !upperValid || !lowerValid || !digitValid || !specialValid) {
+        setError("Password does not meet validation requirements.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       await sendOtp(email.trim().toLowerCase());
@@ -544,15 +575,38 @@ function HomeContent() {
                   </div>
                   <div style={{ marginBottom: 20 }}>
                     <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Password</label>
-                    <input
-                      type="password"
-                      className="input-text"
-                      placeholder=""
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={loading}
-                      required
-                    />
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className="input-text"
+                        style={{ paddingRight: "46px" }}
+                        placeholder=""
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: "absolute",
+                          right: "12px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          color: "rgba(255, 255, 255, 0.6)",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "4px",
+                        }}
+                      >
+                        {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
                   </div>
                   <button type="submit" className="btn-primary" style={{ marginBottom: 12 }} disabled={loading}>
                     {loading ? "Logging in..." : "Log In"}
@@ -609,17 +663,61 @@ function HomeContent() {
                               required
                             />
                           </div>
-                          <div style={{ marginBottom: 20 }}>
+                          <div style={{ marginBottom: 16 }}>
                             <label style={{ fontSize: 12, opacity: 0.7, display: "block", marginBottom: 6 }}>Password</label>
-                            <input
-                              type="password"
-                              className="input-text"
-                              placeholder="Create a password"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              disabled={loading}
-                              required
-                            />
+                            <div style={{ position: "relative" }}>
+                              <input
+                                type={showPassword ? "text" : "password"}
+                                className="input-text"
+                                style={{ paddingRight: "46px" }}
+                                placeholder="Create a password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                disabled={loading}
+                                required
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                  position: "absolute",
+                                  right: "12px",
+                                  top: "50%",
+                                  transform: "translateY(-50%)",
+                                  background: "none",
+                                  border: "none",
+                                  color: "rgba(255, 255, 255, 0.6)",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: "4px",
+                                }}
+                              >
+                                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                              </button>
+                            </div>
+                            
+                            {/* Password requirements validation checklist */}
+                            {password && (
+                              <div style={{ marginTop: 8, fontSize: 11, background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.05)", borderRadius: 8, padding: 8 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, color: password.length >= 8 ? "#66ffaa" : "#ff6b6b", marginBottom: 2 }}>
+                                  <span>{password.length >= 8 ? "✓" : "✗"}</span> At least 8 characters
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, color: /[A-Z]/.test(password) ? "#66ffaa" : "#ff6b6b", marginBottom: 2 }}>
+                                  <span>{/[A-Z]/.test(password) ? "✓" : "✗"}</span> At least one uppercase letter (A-Z)
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, color: /[a-z]/.test(password) ? "#66ffaa" : "#ff6b6b", marginBottom: 2 }}>
+                                  <span>{/[a-z]/.test(password) ? "✓" : "✗"}</span> At least one lowercase letter (a-z)
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, color: /[0-9]/.test(password) ? "#66ffaa" : "#ff6b6b", marginBottom: 2 }}>
+                                  <span>{/[0-9]/.test(password) ? "✓" : "✗"}</span> At least one number (0-9)
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, color: /[!@#$%^&*(),.?":{}|<>]/.test(password) ? "#66ffaa" : "#ff6b6b" }}>
+                                  <span>{/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "✓" : "✗"}</span> At least one special character
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
