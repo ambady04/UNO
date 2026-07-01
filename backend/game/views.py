@@ -10,6 +10,8 @@ from django.utils import timezone
 from .models import GuestUser, Room, RoomPlayer
 from .serializers import GuestUserSerializer, RoomSerializer
 
+ROOM_EXPIRY_HOURS = 2
+
 def clean_old_rooms_helper():
     """
     Cleanup expired database records.
