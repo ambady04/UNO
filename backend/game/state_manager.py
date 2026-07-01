@@ -144,7 +144,8 @@ class GameStateManager:
                 'name': p['name'],
                 'is_connected': p['is_connected'],
                 'called_uno': p['called_uno'],
-                'card_count': hand_len
+                'card_count': hand_len,
+                'avatar_url': p.get('avatar_url')
             })
 
         return {
