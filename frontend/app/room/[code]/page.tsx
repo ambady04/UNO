@@ -139,6 +139,9 @@ export default function RoomPage() {
   const discardPileRef = useRef<HTMLDivElement>(null); // anchor for flying card animation
   const overlayRef = useRef<HTMLDivElement>(null); // flying card overlay element
   const [wsConnected, setWsConnected] = useState<boolean>(false);
+  const [visibleNoUnoPlayer, setVisibleNoUnoPlayer] = useState<PlayerState | null>(null);
+  const [autoPlaySecondsLeft, setAutoPlaySecondsLeft] = useState<number>(30);
+  const [autoPlayPercentage, setAutoPlayPercentage] = useState<number>(100);
   const [confettiParticles, setConfettiParticles] = useState<
     {
       id: number;
@@ -156,6 +159,67 @@ export default function RoomPage() {
   useEffect(() => {
     isChatOpenRef.current = isChatOpen;
   }, [isChatOpen]);
+
+  const targetNoUnoPlayer = gameState?.players.find(
+    (p) => p.id !== guest?.token && p.card_count === 1 && !p.called_uno,
+  );
+
+  // Delay showing the "didn't call UNO" button by 2 seconds
+  useEffect(() => {
+    if (!targetNoUnoPlayer) {
+      setVisibleNoUnoPlayer(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setVisibleNoUnoPlayer(targetNoUnoPlayer);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [targetNoUnoPlayer?.id, targetNoUnoPlayer?.card_count, targetNoUnoPlayer?.called_uno]);
+
+  // Auto-play timer: 30 seconds to draw a card or pass turn (for any active player)
+  useEffect(() => {
+    if (!gameState || gameState.game_status !== "PLAYING") {
+      setAutoPlaySecondsLeft(30);
+      setAutoPlayPercentage(100);
+      return;
+    }
+
+    const duration = 30000; // 30 seconds
+    const startTime = Date.now();
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, duration - elapsed);
+      const seconds = Math.ceil(remaining / 1000);
+      setAutoPlaySecondsLeft(seconds);
+      setAutoPlayPercentage((remaining / duration) * 100);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        // Only trigger the auto play action if it is actually OUR turn
+        if (isMyTurn) {
+          if (gameState.has_drawn_this_turn) {
+            handlePassTurn();
+          } else {
+            handleDrawCard();
+          }
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [
+    gameState?.current_turn,
+    gameState?.has_drawn_this_turn,
+    gameState?.hand?.length,
+    gameState?.game_status
+  ]);
 
   // Drive the flying card animation via WAAPI so it runs on the GPU compositor
   // (CSS vars inside transform prevent compositor offloading — WAAPI uses concrete values)
@@ -195,6 +259,11 @@ export default function RoomPage() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const activePlayer = gameState
+    ? gameState.players[gameState.current_turn]
+    : null;
+  const isMyTurn = activePlayer?.id === guest?.token;
 
   const prevGameStateRef = useRef<FilteredGameState | null>(null);
   const playedPenaltyDrawSoundRef = useRef<boolean>(false);
@@ -774,12 +843,8 @@ export default function RoomPage() {
   }
 
   function handleReportNoUno() {
-    if (!gameState) return;
-    const target = gameState.players.find(
-      (p) => p.id !== guest?.token && p.card_count === 1 && !p.called_uno,
-    );
-    if (target) {
-      handleCallOutUno(target.id);
+    if (visibleNoUnoPlayer) {
+      handleCallOutUno(visibleNoUnoPlayer.id);
     } else {
       showAlert("No players can be called out right now.");
     }
@@ -1106,10 +1171,6 @@ export default function RoomPage() {
     );
   }
 
-  const activePlayer = gameState
-    ? gameState.players[gameState.current_turn]
-    : null;
-  const isMyTurn = activePlayer?.id === guest?.token;
   const myPlayer = gameState?.players.find((p) => p.id === guest?.token);
   const canShoutUno =
     !!gameState && gameState.hand.length === 1 && !myPlayer?.called_uno;
@@ -1120,10 +1181,6 @@ export default function RoomPage() {
     ((gameState.draw_penalty || 0) > 0 ||
       (!gameState.has_drawn_this_turn &&
         gameState.hand.every((c) => !checkPlayableClient(c))));
-
-  const targetNoUnoPlayer = gameState?.players.find(
-    (p) => p.id !== guest?.token && p.card_count === 1 && !p.called_uno,
-  );
 
   const leftOpponents: PlayerState[] = [];
   const topOpponents: PlayerState[] = [];
@@ -1164,6 +1221,27 @@ export default function RoomPage() {
           }
         }}
       >
+        {isActive && (
+          <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }}>
+            <rect
+              x="1"
+              y="1"
+              width="calc(100% - 2px)"
+              height="calc(100% - 2px)"
+              rx="11"
+              fill="none"
+              stroke="var(--color-yellow)"
+              strokeWidth="2.5"
+              pathLength="100"
+              strokeDasharray="100"
+              strokeDashoffset={100 - autoPlayPercentage}
+              style={{
+                transition: "stroke-dashoffset 0.1s linear",
+                filter: "drop-shadow(0px 0px 2.5px rgba(255, 204, 0, 0.7))",
+              }}
+            />
+          </svg>
+        )}
         {roomDetails?.host_id === guest?.token && p.id !== guest?.token && (
           <button
             onClick={(e) => {
@@ -1250,7 +1328,28 @@ export default function RoomPage() {
           }
         }}
       >
-        {roomDetails?.host_id === guest?.token && (
+        {isActive && (
+          <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }}>
+            <rect
+              x="1.5"
+              y="1.5"
+              width="calc(100% - 3px)"
+              height="calc(100% - 3px)"
+              rx="10"
+              fill="none"
+              stroke="var(--color-yellow)"
+              strokeWidth="3"
+              pathLength="100"
+              strokeDasharray="100"
+              strokeDashoffset={100 - autoPlayPercentage}
+              style={{
+                transition: "stroke-dashoffset 0.1s linear",
+                filter: "drop-shadow(0px 0px 3px rgba(255, 204, 0, 0.7))",
+              }}
+            />
+          </svg>
+        )}
+        {roomDetails?.host_id === guest?.token && p.id !== guest?.token && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -1832,8 +1931,39 @@ export default function RoomPage() {
             {leftOpponents.map(renderOpponentAvatar)}
           </div>
 
-          {/* Central Play Table (Felt Style) */}
           <div className="table-felt">
+            {/* Auto-play Timer Loader SVG (around 4 sides) */}
+            {isMyTurn && (
+              <svg
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  zIndex: 40,
+                }}
+              >
+                <rect
+                  x="2"
+                  y="2"
+                  width="calc(100% - 4px)"
+                  height="calc(100% - 4px)"
+                  rx="20"
+                  fill="none"
+                  stroke="var(--color-yellow)"
+                  strokeWidth="4"
+                  pathLength="100"
+                  strokeDasharray="100"
+                  strokeDashoffset={100 - autoPlayPercentage}
+                  style={{
+                    transition: "stroke-dashoffset 0.1s linear",
+                    filter: "drop-shadow(0px 0px 4px rgba(255, 204, 0, 0.8))",
+                  }}
+                />
+              </svg>
+            )}
             {/* Table Header Row (Turn, Color & Direction combined) */}
             <div
               className="table-header-row"
@@ -1965,6 +2095,29 @@ export default function RoomPage() {
               </div>
             </div>
 
+            {/* Inline Alert Overlay - positioned between center piles and bottom controls */}
+            {alertMessage && (
+              <div
+                key={alertMessage}
+                className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
+                style={{
+                  marginTop: "16px",
+                  marginBottom: "4px",
+                  zIndex: 300,
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                  fontSize: 12,
+                  width: "100%",
+                  maxWidth: "280px",
+                  boxSizing: "border-box",
+                  pointerEvents: "none"
+                }}
+              >
+                {alertMessage}
+              </div>
+            )}
+
             {/* Draw Penalty Alert — only shown to the active player who must draw */}
             {(gameState.draw_penalty || 0) > 0 && isMyTurn && (
               <div
@@ -2059,7 +2212,7 @@ export default function RoomPage() {
               </button>
 
               {/* "Player didn't call UNO!" pill */}
-              {targetNoUnoPlayer && (
+              {visibleNoUnoPlayer && (
                 <button
                   onClick={handleReportNoUno}
                   style={{
@@ -2082,7 +2235,7 @@ export default function RoomPage() {
                   }}
                 >
                   <span style={{ fontSize: 14 }}>🚨</span>
-                  {targetNoUnoPlayer.name}
+                  {visibleNoUnoPlayer.name}
                   <span style={{ fontSize: 14 }}> didn&apos;t call UNO!</span>
                 </button>
               )}
@@ -2250,38 +2403,7 @@ export default function RoomPage() {
             {rightOpponents.map(renderOpponentAvatar)}
           </div>
 
-          {/* Alert Overlay — positioned in the center black space between felt table and player hand */}
-          {alertMessage && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: "210px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 9999,
-                pointerEvents: "none",
-                width: "100%",
-                maxWidth: "280px",
-                display: "flex",
-                justifyContent: "center"
-              }}
-            >
-              <div
-                key={alertMessage}
-                className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
-                style={{
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  textAlign: "center",
-                  fontSize: 12,
-                  width: "100%",
-                  boxSizing: "border-box"
-                }}
-              >
-                {alertMessage}
-              </div>
-            </div>
-          )}
+          {/* Alert message has been moved inline inside the table felt */}
 
           {/* Bottom Player Hand & Info */}
           <div className="player-bottom-panel">
@@ -2390,7 +2512,7 @@ export default function RoomPage() {
                   )}
                 </div>
                 {isMyTurn && (gameState.draw_penalty || 0) === 0 && (
-                  <span style={{ color: "#ffcc00", fontWeight: 800 }}>
+                  <span className="my-turn-text">
                     Your Turn to Play!
                   </span>
                 )}

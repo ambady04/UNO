@@ -237,8 +237,8 @@ function applyBotPlayPure(
 
   if (next.botHand.length === 0)
     return [{ ...next, gameStatus: "FINISHED", winner: "bot" }, ""];
-  const unoMsg = next.botHand.length === 1 ? "🤖 Bot: UNO!" : "";
-  if (next.botHand.length === 1) next = { ...next, botCalledUno: true };
+  const unoMsg = ""; // Bot will declare UNO with a delay via useEffect
+  if (next.botHand.length === 1) next = { ...next, botCalledUno: false };
 
   if (cv === "Skip") {
     next = { ...next, currentTurn: "bot" };
@@ -383,9 +383,14 @@ export default function BotGamePage() {
   const [confettiParticles, setConfettiParticles] = useState<
     { id: number; dx: string; dy: string; color: string; rot: string; duration: string; left: string; top: string }[]
   >([]);
+  const [visibleNoUnoBot, setVisibleNoUnoBot] = useState<boolean>(false);
+  const [autoPlaySecondsLeft, setAutoPlaySecondsLeft] = useState<number>(30);
+  const [autoPlayPercentage, setAutoPlayPercentage] = useState<number>(100);
 
   const prevGsRef = useRef<BotGameState | null>(null);
   const botTurnInProgressRef = useRef(false);
+
+  const isPlayerTurn = gs?.currentTurn === "player";
 
   // Play sound effects dynamically based on state transitions
   useEffect(() => {
@@ -456,7 +461,7 @@ export default function BotGamePage() {
     }
   }, [gs?.hasDrawnThisTurn, gs?.drawPenalty, gs?.playerHand, gs?.currentColor, gs?.currentValue, gs?.currentTurn, gs?.gameStatus, showMsg]);
 
-  // Bot catches player not calling UNO
+  // Bot catches player not calling UNO (after 2 seconds)
   useEffect(() => {
     if (!gs || gs.gameStatus !== "PLAYING") return;
     if (gs.playerHand.length === 1 && !gs.playerCalledUno) {
@@ -468,10 +473,94 @@ export default function BotGamePage() {
           gameSounds.play("reportNoUno");
           return { ...current, playerHand: [...current.playerHand, ...drawn], deck, discardPile: discard, playerCalledUno: true };
         });
-      }, 3000);
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [gs?.playerHand?.length, gs?.playerCalledUno, gs?.gameStatus, showMsg]);
+
+  // Auto-play timer in Bot mode: 30 seconds to draw a card or pass turn (for any active player)
+  useEffect(() => {
+    if (!gs || gs.gameStatus !== "PLAYING") {
+      setAutoPlaySecondsLeft(30);
+      setAutoPlayPercentage(100);
+      return;
+    }
+
+    const duration = 30000; // 30 seconds
+    const startTime = Date.now();
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, duration - elapsed);
+      const seconds = Math.ceil(remaining / 1000);
+      setAutoPlaySecondsLeft(seconds);
+      setAutoPlayPercentage((remaining / duration) * 100);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        // Only trigger the auto play action if it is actually the player's turn
+        if (isPlayerTurn) {
+          if (gs.hasDrawnThisTurn) {
+            playerPassTurn();
+          } else {
+            playerDrawCard();
+          }
+        }
+      }
+    }, 100);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [
+    gs?.currentTurn,
+    gs?.hasDrawnThisTurn,
+    gs?.playerHand?.length,
+    gs?.gameStatus
+  ]);
+
+  // Bot declares UNO after a delay of 3 seconds
+  useEffect(() => {
+    if (!gs || gs.gameStatus !== "PLAYING") return;
+    if (gs.botHand.length === 1 && !gs.botCalledUno) {
+      const timer = setTimeout(() => {
+        setGs((current) => {
+          if (!current || current.gameStatus !== "PLAYING" || current.botHand.length !== 1 || current.botCalledUno) return current;
+          showMsg("🤖 Bot: UNO!");
+          gameSounds.play("unoShout");
+          return { ...current, botCalledUno: true };
+        });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [gs?.botHand?.length, gs?.botCalledUno, gs?.gameStatus, showMsg]);
+
+  // Delay showing "Bot didn't call UNO" button for 2 seconds
+  useEffect(() => {
+    if (!gs || gs.botHand.length !== 1 || gs.botCalledUno) {
+      setVisibleNoUnoBot(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setVisibleNoUnoBot(true);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [gs?.botHand?.length, gs?.botCalledUno]);
+
+  function handleReportBotNoUno() {
+    if (!visibleNoUnoBot) return;
+    setGs((current) => {
+      if (!current || current.gameStatus !== "PLAYING" || current.botHand.length !== 1 || current.botCalledUno) return current;
+      const { drawn, deck, discard } = drawCards(current.deck, current.discardPile, 2);
+      showMsg("🎉 You caught the bot not calling UNO! Bot draws 2 cards.");
+      gameSounds.play("reportNoUno");
+      return { ...current, botHand: [...current.botHand, ...drawn], deck, discardPile: discard, botCalledUno: true };
+    });
+  }
 
   function handleExit() {
     if (typeof window !== "undefined") localStorage.removeItem(storageKey);
@@ -676,7 +765,6 @@ export default function BotGamePage() {
   // ─── Derived ─────────────────────────────────────────────────────────────────
   const topCard = gs.discardPile[gs.discardPile.length - 1];
   const sortedHand = sortHand(gs.playerHand);
-  const isPlayerTurn = gs.currentTurn === "player";
   const hasPlayable = sortedHand.some((c) => isPlayable(c, gs.currentColor, gs.currentValue, gs.drawPenalty, gs.hasDrawnThisTurn));
   const needsToDraw = isPlayerTurn && (gs.drawPenalty > 0 || (!gs.hasDrawnThisTurn && !hasPlayable));
 
@@ -708,6 +796,27 @@ export default function BotGamePage() {
       {/* Bot Avatar */}
       <div className="opponents-top" style={{ marginTop: 52 }}>
         <div className={`opponent-avatar ${gs.currentTurn === "bot" ? "active-turn" : ""}`} style={{ position: "relative" }}>
+          {gs.currentTurn === "bot" && (
+            <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 5 }}>
+              <rect
+                x="1.5"
+                y="1.5"
+                width="calc(100% - 3px)"
+                height="calc(100% - 3px)"
+                rx="10"
+                fill="none"
+                stroke="var(--color-yellow)"
+                strokeWidth="3"
+                pathLength="100"
+                strokeDasharray="100"
+                strokeDashoffset={100 - autoPlayPercentage}
+                style={{
+                  transition: "stroke-dashoffset 0.1s linear",
+                  filter: "drop-shadow(0px 0px 3px rgba(255, 204, 0, 0.7))",
+                }}
+              />
+            </svg>
+          )}
           <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>🤖 Bot</span>
           <div className="opponent-card-stack">
             {Array.from({ length: Math.min(3, gs.botHand.length) }).map((_, cIdx) => (
@@ -725,8 +834,39 @@ export default function BotGamePage() {
         </div>
       </div>
 
-      {/* Felt Table */}
       <div className="table-felt" style={{ marginTop: "52px" }}>
+        {/* Auto-play Timer Loader SVG (around 4 sides) */}
+        {isPlayerTurn && (
+          <svg
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              pointerEvents: "none",
+              zIndex: 40,
+            }}
+          >
+            <rect
+              x="2"
+              y="2"
+              width="calc(100% - 4px)"
+              height="calc(100% - 4px)"
+              rx="20"
+              fill="none"
+              stroke="var(--color-yellow)"
+              strokeWidth="4"
+              pathLength="100"
+              strokeDasharray="100"
+              strokeDashoffset={100 - autoPlayPercentage}
+              style={{
+                transition: "stroke-dashoffset 0.1s linear",
+                filter: "drop-shadow(0px 0px 4px rgba(255, 204, 0, 0.8))",
+              }}
+            />
+          </svg>
+        )}
         {/* Turn & Color (Hidden on mobile since they are now in the top header) */}
         <div className="table-header-row hide-mobile" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", zIndex: 30 }}>
           <div style={{ padding: "5px 12px", borderRadius: 12, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.1)", color: isPlayerTurn ? "#ffcc00" : "#fff", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}>
@@ -752,6 +892,29 @@ export default function BotGamePage() {
             {gs.discardPile.length > 0 && renderUnoCard(topCard, undefined, { cursor: "default", animation: "card-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" }, topCard)}
           </div>
         </div>
+
+        {/* Inline Toast messages - positioned between center piles and bottom controls */}
+        {toasts.slice(-1).map((t) => (
+          <div
+            key={t.id}
+            className="bot-toast-msg-inline"
+            style={{
+              marginTop: "16px",
+              marginBottom: "4px",
+              zIndex: 300,
+              whiteSpace: "normal",
+              wordBreak: "break-word",
+              textAlign: "center",
+              fontSize: 12,
+              width: "100%",
+              maxWidth: "280px",
+              boxSizing: "border-box",
+              pointerEvents: "none"
+            }}
+          >
+            {t.text}
+          </div>
+        ))}
 
         {/* Draw penalty alert */}
         {gs.drawPenalty > 0 && isPlayerTurn && (
@@ -803,20 +966,42 @@ export default function BotGamePage() {
         {/* Action buttons */}
         <div className="table-action-row" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, zIndex: 30 }}>
           <button onClick={callUno} className="btn-uno-shout" disabled={!(gs.playerHand.length === 1 && !gs.playerCalledUno)}>UNO</button>
+          
+          {visibleNoUnoBot && (
+            <button
+              onClick={handleReportBotNoUno}
+              style={{
+                height: "44px",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                background: "linear-gradient(135deg, #cc2200, #ff4400)",
+                border: "2px solid #ff6600",
+                borderRadius: 24,
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 800,
+                padding: "6px 14px",
+                cursor: "pointer",
+                boxShadow: "0 0 14px rgba(255,68,0,0.7)",
+                animation: "pulse 1.2s infinite",
+                whiteSpace: "nowrap",
+                letterSpacing: 0.3,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>🚨</span>
+              Bot
+              <span style={{ fontSize: 14 }}> didn&apos;t call UNO!</span>
+            </button>
+          )}
+
           {gs.hasDrawnThisTurn && gs.drawPenalty === 0 && isPlayerTurn && hasPlayable && (
             <button onClick={playerPassTurn} className="btn-primary" style={{ background: "#00cc66", color: "#fff", minHeight: 44, padding: "0 20px", width: "auto", borderRadius: 12, fontSize: 14, fontWeight: 800, boxShadow: "0 0 12px rgba(0,204,102,0.4)", letterSpacing: 0.5 }}>✓ Pass</button>
           )}
         </div>
       </div>
 
-      {/* Toast stack — positioned in the center black space between felt table and player hand */}
-      <div style={{ position: "absolute", bottom: "210px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 9999, pointerEvents: "none", width: "100%", maxWidth: "280px" }}>
-        {toasts.slice(-1).map((t) => (
-          <div key={t.id} className="bot-toast-msg-inline" style={{ position: "relative", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
-            {t.text}
-          </div>
-        ))}
-      </div>
+      {/* Toast message has been moved inline inside the table felt */}
 
       {/* Player Hand */}
       <div className="player-bottom-panel">
@@ -860,7 +1045,7 @@ export default function BotGamePage() {
                 <span style={{ fontSize: 10, background: "#ff3333", color: "#ffffff", padding: "2px 6px", borderRadius: 6, fontWeight: 800, boxShadow: "0 0 8px rgba(255,51,51,0.6)", letterSpacing: 0.5 }}>UNO DECLARED</span>
               )}
             </div>
-            {isPlayerTurn && <span style={{ color: "#ffcc00", fontWeight: 800 }}>Your Turn to Play!</span>}
+            {isPlayerTurn && <span className="my-turn-text">Your Turn to Play!</span>}
           </div>
         </div>
       </div>
