@@ -893,6 +893,29 @@ export default function BotGamePage() {
           </div>
         </div>
 
+        {/* Inline Toast messages - positioned between center piles and bottom controls */}
+        {toasts.slice(-1).map((t) => (
+          <div
+            key={t.id}
+            className="bot-toast-msg-inline"
+            style={{
+              marginTop: "16px",
+              marginBottom: "4px",
+              zIndex: 300,
+              whiteSpace: "normal",
+              wordBreak: "break-word",
+              textAlign: "center",
+              fontSize: 12,
+              width: "100%",
+              maxWidth: "280px",
+              boxSizing: "border-box",
+              pointerEvents: "none"
+            }}
+          >
+            {t.text}
+          </div>
+        ))}
+
         {/* Draw penalty alert */}
         {gs.drawPenalty > 0 && isPlayerTurn && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,40,40,0.18)", border: "1.5px solid rgba(255,80,80,0.55)", borderRadius: 12, padding: "7px 20px", color: "#ff5555", fontWeight: 800, fontSize: 14, letterSpacing: 0.4, boxShadow: "0 0 16px rgba(255,51,51,0.25)", animation: "pulse 1.2s infinite", marginTop: 12 }}>
@@ -978,14 +1001,7 @@ export default function BotGamePage() {
         </div>
       </div>
 
-      {/* Toast stack — positioned in the center black space between felt table and player hand */}
-      <div style={{ position: "absolute", bottom: "210px", left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 6, zIndex: 9999, pointerEvents: "none", width: "100%", maxWidth: "280px" }}>
-        {toasts.slice(-1).map((t) => (
-          <div key={t.id} className="bot-toast-msg-inline" style={{ position: "relative", whiteSpace: "normal", wordBreak: "break-word", textAlign: "center", fontSize: 12, width: "100%", boxSizing: "border-box" }}>
-            {t.text}
-          </div>
-        ))}
-      </div>
+      {/* Toast message has been moved inline inside the table felt */}
 
       {/* Player Hand */}
       <div className="player-bottom-panel">

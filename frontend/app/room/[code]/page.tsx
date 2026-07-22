@@ -2095,6 +2095,29 @@ export default function RoomPage() {
               </div>
             </div>
 
+            {/* Inline Alert Overlay - positioned between center piles and bottom controls */}
+            {alertMessage && (
+              <div
+                key={alertMessage}
+                className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
+                style={{
+                  marginTop: "16px",
+                  marginBottom: "4px",
+                  zIndex: 300,
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                  textAlign: "center",
+                  fontSize: 12,
+                  width: "100%",
+                  maxWidth: "280px",
+                  boxSizing: "border-box",
+                  pointerEvents: "none"
+                }}
+              >
+                {alertMessage}
+              </div>
+            )}
+
             {/* Draw Penalty Alert — only shown to the active player who must draw */}
             {(gameState.draw_penalty || 0) > 0 && isMyTurn && (
               <div
@@ -2380,38 +2403,7 @@ export default function RoomPage() {
             {rightOpponents.map(renderOpponentAvatar)}
           </div>
 
-          {/* Alert Overlay — positioned in the center black space between felt table and player hand */}
-          {alertMessage && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: "210px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 9999,
-                pointerEvents: "none",
-                width: "100%",
-                maxWidth: "280px",
-                display: "flex",
-                justifyContent: "center"
-              }}
-            >
-              <div
-                key={alertMessage}
-                className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
-                style={{
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  textAlign: "center",
-                  fontSize: 12,
-                  width: "100%",
-                  boxSizing: "border-box"
-                }}
-              >
-                {alertMessage}
-              </div>
-            </div>
-          )}
+          {/* Alert message has been moved inline inside the table felt */}
 
           {/* Bottom Player Hand & Info */}
           <div className="player-bottom-panel">
