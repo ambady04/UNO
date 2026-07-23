@@ -2101,7 +2101,7 @@ export default function RoomPage() {
                 key={alertMessage}
                 className={`room-alert-inline ${alertType === "success" ? "room-alert-success" : "room-alert-error"}`}
                 style={{
-                  marginTop: "16px",
+                  marginTop: "8px",
                   marginBottom: "4px",
                   zIndex: 300,
                   whiteSpace: "normal",
@@ -2128,15 +2128,15 @@ export default function RoomPage() {
                   background: "rgba(255, 40, 40, 0.18)",
                   border: "1.5px solid rgba(255,80,80,0.55)",
                   borderRadius: 12,
-                  padding: "7px 20px",
+                  padding: "5px 18px",
                   color: "#ff5555",
                   fontWeight: 800,
-                  fontSize: 14,
+                  fontSize: 13,
                   letterSpacing: 0.4,
                   boxShadow: "0 0 16px rgba(255,51,51,0.25)",
                   animation: "pulse 1.2s infinite",
-                  marginTop: 12,
-                  marginBottom: 50,
+                  marginTop: 4,
+                  marginBottom: 4,
                   pointerEvents: "none",
                   zIndex: 10,
                 }}
@@ -2158,8 +2158,8 @@ export default function RoomPage() {
                   borderRadius: 8,
                   padding: "3px 12px",
                   color: "#ff8888",
-                  marginTop: 12,
-                  marginBottom: 50,
+                  marginTop: 4,
+                  marginBottom: 4,
                   pointerEvents: "none",
                   zIndex: 10,
                 }}
@@ -2181,18 +2181,21 @@ export default function RoomPage() {
                     alignItems: "center",
                     gap: 6,
                     background: "rgba(255,170,0,0.12)",
-                    border: "1px solid rgba(255,170,0,0.4)",
+                    border: "1.5px solid rgba(255,170,0,0.4)",
                     borderRadius: 10,
-                    padding: "5px 14px",
+                    padding: "4px 12px",
                     color: "#ffaa00",
                     fontWeight: 700,
-                    fontSize: 12,
-                    marginTop: 12,
-                    marginBottom: 50,
+                    fontSize: 11,
+                    marginTop: 4,
+                    marginBottom: 4,
                     pointerEvents: "none",
                     zIndex: 10,
                   }}
                 >
+                  🎴 No playable cards — draw from the deck!
+                </div>
+              )}   )}  >
                   🎴 No playable cards — draw from the deck!
                 </div>
               )}

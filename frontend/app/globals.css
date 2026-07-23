@@ -153,15 +153,16 @@ body {
 .table-felt {
   position: relative !important;
   flex: 1;
-  min-height: 0;
-  max-height: 44vh !important;
+  min-height: 360px !important;
+  max-height: 52vh !important;
   max-width: 1000px !important;
   align-self: center !important;
   width: calc(100% - 8px) !important;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 14px 16px !important;
   background: radial-gradient(circle at center, #145c2d 0%, #082d14 100%);
   border: 5px solid #4a2810;
   border-radius: 24px;
@@ -169,21 +170,21 @@ body {
     0 10px 30px rgba(0, 0, 0, 0.6),
     inset 0 4px 16px rgba(0, 0, 0, 0.5);
   margin: 4px;
-  gap: 8px;
   overflow: hidden;
 }
 
 .table-header-row {
-  position: absolute !important;
-  top: 16px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
   display: flex !important;
-  gap: 8px !important;
+  gap: 10px !important;
   align-items: center !important;
   justify-content: center !important;
   z-index: 30 !important;
   width: 100% !important;
+  margin: 0 0 8px 0 !important;
   pointer-events: none !important;
 }
 
@@ -192,16 +193,17 @@ body {
 }
 
 .table-action-row {
-  position: absolute !important;
-  bottom: 16px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  transform: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 12px !important;
   z-index: 900 !important;
   width: 100% !important;
+  margin: 8px 0 0 0 !important;
   pointer-events: none !important;
 }
 
@@ -341,11 +343,12 @@ body {
   gap: 20px;
   position: relative;
   z-index: 10;
+  margin: 4px 0 !important;
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 16px 28px;
+  padding: 6px 18px;
   border-radius: 20px;
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.25),

@@ -235,3 +235,24 @@ export async function updateUserProfile(nickname: string, avatarFile?: File): Pr
   return data;
 }
 
+export async function loginWithGoogle(email: string, nickname?: string, picture?: string): Promise<ProfileResponse> {
+  const res = await fetch(`${BASE_URL}/api/auth/google/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, nickname, picture }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || err.error || 'Google login failed.');
+  }
+  const data: ProfileResponse = await res.json();
+  setStoredGuest(data.token, data.nickname);
+  if (data.avatar_url) {
+    localStorage.setItem('uno_guest_avatar', data.avatar_url);
+  } else {
+    localStorage.removeItem('uno_guest_avatar');
+  }
+  return data;
+}
+
+

@@ -899,7 +899,7 @@ export default function BotGamePage() {
             key={t.id}
             className="bot-toast-msg-inline"
             style={{
-              marginTop: "16px",
+              marginTop: "4px",
               marginBottom: "4px",
               zIndex: 300,
               whiteSpace: "normal",
@@ -907,7 +907,7 @@ export default function BotGamePage() {
               textAlign: "center",
               fontSize: 12,
               width: "100%",
-              maxWidth: "280px",
+              maxWidth: "250px",
               boxSizing: "border-box",
               pointerEvents: "none"
             }}
@@ -918,14 +918,14 @@ export default function BotGamePage() {
 
         {/* Draw penalty alert */}
         {gs.drawPenalty > 0 && isPlayerTurn && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,40,40,0.18)", border: "1.5px solid rgba(255,80,80,0.55)", borderRadius: 12, padding: "7px 20px", color: "#ff5555", fontWeight: 800, fontSize: 14, letterSpacing: 0.4, boxShadow: "0 0 16px rgba(255,51,51,0.25)", animation: "pulse 1.2s infinite", marginTop: 12, marginBottom: 50, pointerEvents: "none", zIndex: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,40,40,0.18)", border: "1.5px solid rgba(255,80,80,0.55)", borderRadius: 12, padding: "5px 18px", color: "#ff5555", fontWeight: 800, fontSize: 13, letterSpacing: 0.4, boxShadow: "0 0 16px rgba(255,51,51,0.25)", animation: "pulse 1.2s infinite", marginTop: 4, marginBottom: 4, pointerEvents: "none", zIndex: 10 }}>
             ⚠️ Draw {gs.drawPenalty} card{gs.drawPenalty !== 1 ? "s" : ""}! Click the deck!
           </div>
         )}
 
         {/* No playable cards hint */}
         {isPlayerTurn && gs.drawPenalty === 0 && !gs.hasDrawnThisTurn && gs.playerHand.length > 0 && !hasPlayable && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,170,0,0.12)", border: "1px solid rgba(255,170,0,0.4)", borderRadius: 10, padding: "5px 14px", color: "#ffaa00", fontWeight: 700, fontSize: 12, marginTop: 12, marginBottom: 50, pointerEvents: "none", zIndex: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,170,0,0.12)", border: "1px solid rgba(255,170,0,0.4)", borderRadius: 10, padding: "4px 12px", color: "#ffaa00", fontWeight: 700, fontSize: 11, marginTop: 4, marginBottom: 4, pointerEvents: "none", zIndex: 10 }}>
             🎴 No playable cards — draw from the deck!
           </div>
         )}

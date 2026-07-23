@@ -1,8 +1,10 @@
+import hashlib
 import os
 import random
 import time
 import uuid
 import smtplib
+import httpx
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -17,6 +19,7 @@ from sqlalchemy.orm import Session
 from database import get_db, clean_old_rooms_helper, engine
 from models import GuestUser, Room, RoomPlayer, OTPRequest
 from sqladmin import Admin, ModelView
+from markupsafe import Markup
 from schemas import (
     serialize_guest_user,
     serialize_room,
@@ -64,14 +67,35 @@ class GuestUserAdmin(ModelView, model=GuestUser):
     name = "User"
     name_plural = "Users"
     icon = "fa-solid fa-user"
-    column_list = [GuestUser.nickname, GuestUser.email, GuestUser.is_registered, GuestUser.token, GuestUser.created_at]
+    column_list = [GuestUser.nickname, GuestUser.email, GuestUser.is_registered, GuestUser.avatar, GuestUser.token, GuestUser.created_at]
+    column_details_list = [GuestUser.token, GuestUser.nickname, GuestUser.email, GuestUser.is_registered, GuestUser.avatar, GuestUser.created_at]
     column_searchable_list = [GuestUser.nickname, GuestUser.email]
     column_labels = {
         "token": "User Token",
         "nickname": "Nickname",
         "email": "Email Address",
         "is_registered": "Registered",
+        "avatar": "Avatar Image",
         "created_at": "Created At"
+    }
+
+    def _format_avatar(model, attribute):
+        val = getattr(model, attribute, None)
+        if not val:
+            return "No Avatar"
+        url = f"/media/{val}" if not str(val).startswith("media/") else f"/{val}"
+        return Markup(
+            f'<a href="{url}" target="_blank" title="Click to view full image" style="color: #0066cc; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 8px;">'
+            f'<img src="{url}" style="height: 36px; width: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid #0066cc; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" />'
+            f'<span>{val} ↗</span>'
+            f'</a>'
+        )
+
+    column_formatters = {
+        GuestUser.avatar: _format_avatar
+    }
+    column_formatters_detail = {
+        GuestUser.avatar: _format_avatar
     }
 
 class RoomAdmin(ModelView, model=Room):
@@ -252,6 +276,71 @@ def send_otp(payload: dict, db: Session = Depends(get_db)):
         
     return {"message": "OTP sent successfully. Please check your email."}
 
+def auto_fetch_email_avatar(email: str, google_picture_url: Optional[str] = None) -> Optional[str]:
+    if google_picture_url and google_picture_url.startswith("http"):
+        try:
+            res = httpx.get(google_picture_url, timeout=4.0)
+            if res.status_code == 200 and len(res.content) > 100:
+                ext = "png"
+                content_type = res.headers.get("content-type", "")
+                if "jpeg" in content_type or "jpg" in content_type:
+                    ext = "jpg"
+                fname = f"avatars/google_{uuid.uuid4().hex[:12]}.{ext}"
+                filepath = MEDIA_DIR / fname
+                filepath.write_bytes(res.content)
+                return fname
+        except Exception as e:
+            print("Google avatar download exception:", e)
+            return google_picture_url
+
+    try:
+        email_hash = hashlib.md5(email.strip().lower().encode('utf-8')).hexdigest()
+        gravatar_url = f"https://www.gravatar.com/avatar/{email_hash}?d=404&s=256"
+        res = httpx.get(gravatar_url, timeout=3.0, follow_redirects=True)
+        if res.status_code == 200 and len(res.content) > 100:
+            fname = f"avatars/gravatar_{uuid.uuid4().hex[:12]}.jpg"
+            filepath = MEDIA_DIR / fname
+            filepath.write_bytes(res.content)
+            return fname
+    except Exception as e:
+        print("Gravatar fetch exception:", e)
+
+    return None
+
+@app.post("/api/auth/google/", response_model=GuestUserResponse)
+def google_auth(request: Request, payload: dict, db: Session = Depends(get_db)):
+    clean_old_rooms_helper(db)
+    email = payload.get('email', '').strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required.")
+        
+    nickname = payload.get('nickname', '').strip() or email.split('@')[0].capitalize()
+    picture_url = payload.get('picture', '').strip()
+    
+    user = db.query(GuestUser).filter(GuestUser.email == email).first()
+    fetched_avatar = auto_fetch_email_avatar(email, picture_url)
+    
+    if user:
+        user.is_registered = True
+        if not user.nickname:
+            user.nickname = nickname
+        if not user.avatar and fetched_avatar:
+            user.avatar = fetched_avatar
+        db.commit()
+        db.refresh(user)
+    else:
+        user = GuestUser(
+            email=email,
+            nickname=nickname,
+            is_registered=True,
+            avatar=fetched_avatar
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+    return serialize_guest_user(user, get_base_url(request))
+
 @app.post("/api/auth/verify-otp/")
 def verify_otp(request: Request, payload: dict, db: Session = Depends(get_db)):
     clean_old_rooms_helper(db)
@@ -287,6 +376,11 @@ def verify_otp(request: Request, payload: dict, db: Session = Depends(get_db)):
     if password:
         user.password_hash = make_password(password)
         
+    if not user.avatar:
+        fetched = auto_fetch_email_avatar(email)
+        if fetched:
+            user.avatar = fetched
+
     db.commit()
     db.refresh(user)
     
