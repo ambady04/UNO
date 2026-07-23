@@ -200,7 +200,7 @@ body {
   align-items: center !important;
   justify-content: center !important;
   gap: 12px !important;
-  z-index: 30 !important;
+  z-index: 900 !important;
   width: 100% !important;
   pointer-events: none !important;
 }
@@ -948,7 +948,9 @@ body {
     transform 0.1s,
     box-shadow 0.2s;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6);
-  z-index: 15;
+  position: relative !important;
+  z-index: 1000 !important;
+  pointer-events: auto !important;
 }
 
 .btn-uno-shout:hover:not(:disabled) {

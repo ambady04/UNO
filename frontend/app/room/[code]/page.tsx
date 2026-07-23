@@ -2136,6 +2136,9 @@ export default function RoomPage() {
                   boxShadow: "0 0 16px rgba(255,51,51,0.25)",
                   animation: "pulse 1.2s infinite",
                   marginTop: 12,
+                  marginBottom: 50,
+                  pointerEvents: "none",
+                  zIndex: 10,
                 }}
               >
                 ⚠️ Draw {gameState.draw_penalty} card
@@ -2156,6 +2159,9 @@ export default function RoomPage() {
                   padding: "3px 12px",
                   color: "#ff8888",
                   marginTop: 12,
+                  marginBottom: 50,
+                  pointerEvents: "none",
+                  zIndex: 10,
                 }}
               >
                 {activePlayer?.name} must draw {gameState.draw_penalty} card
@@ -2182,6 +2188,9 @@ export default function RoomPage() {
                     fontWeight: 700,
                     fontSize: 12,
                     marginTop: 12,
+                    marginBottom: 50,
+                    pointerEvents: "none",
+                    zIndex: 10,
                   }}
                 >
                   🎴 No playable cards — draw from the deck!
