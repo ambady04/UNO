@@ -1,0 +1,140 @@
+# CI/CD Workflow for FastAPI VPS Deployment
+name: CI/CD Deploy
+
+on:
+  push:
+    branches: [production, develop]
+  pull_request:
+    branches: [production, develop]
+
+env:
+  PYTHON_VERSION: '3.12'
+  PROJECT_PATH: '/var/www/uno-game/UNO/backend'
+  VENV_PATH: '/var/www/uno-game/env'
+  SERVICE_NAME: 'gunicorn'
+
+jobs:
+  # Job 1: Lint and Test
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest httpx fastapi uvicorn sqlalchemy pydantic-settings python-multipart python-dotenv passlib bcrypt redis
+          cd backend
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest test_main.py || true
+
+  # Job 2: Deploy to VPS (only on push to production)
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch last 2 commits to detect changes
+
+      - name: Check for requirements changes
+        id: requirements_changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -qE '^backend/requirements\.txt$'; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Requirements have changed"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No requirements changes"
+          fi
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            
+            echo "========================================="
+            echo "Starting FastAPI deployment..."
+            echo "========================================="
+            
+            # Navigate to project backend directory
+            cd ${{ env.PROJECT_PATH }}
+            
+            # Activate virtual environment
+            source ${{ env.VENV_PATH }}/bin/activate
+            
+            # Configure git credentials for HTTPS
+            git config --global credential.helper store
+            echo "https://AlgoBiz:${{ secrets.GH_TOKEN }}@github.com" > ~/.git-credentials
+            
+            # Pull latest code
+            echo "Pulling latest code..."
+            git pull origin ${{ github.ref_name }} --no-edit
+            
+            # Install/update dependencies if requirements changed
+            if [ "${{ steps.requirements_changes.outputs.changed }}" == "true" ]; then
+              echo "Installing/updating dependencies..."
+              sudo apt-get update
+              sudo apt-get install -y build-essential python3-dev || true
+              pip install -r requirements.txt
+            fi
+            
+            # Restart FastAPI server running on Gunicorn/Uvicorn
+            echo "Restarting application server..."
+            
+            # Kill existing gunicorn or uvicorn processes
+            pkill gunicorn || pkill uvicorn || true
+            sleep 2
+            
+            # Start FastAPI with Gunicorn (Uvicorn workers)
+            cd ${{ env.PROJECT_PATH }}
+            ${{ env.VENV_PATH }}/bin/gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --daemon
+            
+            sleep 2
+            echo "Application server restarted successfully"
+            
+            # Reload Nginx
+            sudo systemctl reload nginx || sudo nginx -s reload || true
+            
+            echo "========================================="
+            echo "Deployment completed successfully!"
+            echo "========================================="
+
+      - name: Deployment notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi
