@@ -32,6 +32,7 @@ venv/
 .venv/
 env/
 ENV/
+backend/venv/
 
 # Python Cache & Compiled Files
 **/__pycache__/

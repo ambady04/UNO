@@ -21,6 +21,9 @@ class GuestUser(Base):
     hosted_rooms = relationship("Room", back_populates="host", cascade="all, delete-orphan")
     players_relations = relationship("RoomPlayer", back_populates="user", cascade="all, delete-orphan")
 
+    def __str__(self):
+        return f"{self.nickname} ({str(self.token)[:8]})"
+
 
 class OTPRequest(Base):
     __tablename__ = "game_otprequest"
@@ -30,6 +33,9 @@ class OTPRequest(Base):
     otp_code = Column(String(6), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at = Column(DateTime, nullable=False)
+
+    def __str__(self):
+        return f"{self.email} - {self.otp_code}"
 
 
 class Room(Base):
@@ -45,6 +51,9 @@ class Room(Base):
     # Relationships
     host = relationship("GuestUser", back_populates="hosted_rooms")
     players_relations = relationship("RoomPlayer", back_populates="room", cascade="all, delete-orphan", order_by="RoomPlayer.slot_index")
+
+    def __str__(self):
+        return f"Room {self.code} ({self.status})"
 
 
 class RoomPlayer(Base):
@@ -63,3 +72,9 @@ class RoomPlayer(Base):
     __table_args__ = (
         UniqueConstraint("room_id", "user_id", name="game_roomplayer_room_id_user_id_uniq"),
     )
+
+    def __str__(self):
+        user_name = self.user.nickname if self.user else str(self.user_id)[:8]
+        room_code = self.room.code if self.room else str(self.room_id)
+        return f"{user_name} in {room_code}"
+

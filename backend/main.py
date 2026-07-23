@@ -14,8 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from database import get_db, clean_old_rooms_helper
+from database import get_db, clean_old_rooms_helper, engine
 from models import GuestUser, Room, RoomPlayer, OTPRequest
+from sqladmin import Admin, ModelView
 from schemas import (
     serialize_guest_user,
     serialize_room,
@@ -46,6 +47,78 @@ AVATARS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Mount media directory to serve uploads
 app.mount("/media", StaticFiles(directory="media"), name="media")
+
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "message": "UNO! Multiplayer FastAPI Backend is running.",
+        "documentation": "/docs",
+        "admin_panel": "/admin"
+    }
+
+# Configure SQLAdmin Dashboard (Django-like Admin GUI)
+admin = Admin(app, engine, title="UNO! Admin Dashboard")
+
+class GuestUserAdmin(ModelView, model=GuestUser):
+    name = "User"
+    name_plural = "Users"
+    icon = "fa-solid fa-user"
+    column_list = [GuestUser.nickname, GuestUser.email, GuestUser.is_registered, GuestUser.token, GuestUser.created_at]
+    column_searchable_list = [GuestUser.nickname, GuestUser.email]
+    column_labels = {
+        "token": "User Token",
+        "nickname": "Nickname",
+        "email": "Email Address",
+        "is_registered": "Registered",
+        "created_at": "Created At"
+    }
+
+class RoomAdmin(ModelView, model=Room):
+    name = "Room"
+    name_plural = "Rooms"
+    icon = "fa-solid fa-door-open"
+    column_list = [Room.code, Room.status, Room.host, Room.created_at]
+    column_searchable_list = [Room.code]
+    column_labels = {
+        "code": "Room Code",
+        "status": "Status",
+        "host": "Host",
+        "created_at": "Created At",
+        "updated_at": "Updated At"
+    }
+
+class RoomPlayerAdmin(ModelView, model=RoomPlayer):
+    name = "Room Player"
+    name_plural = "Room Players"
+    icon = "fa-solid fa-users"
+    column_list = [RoomPlayer.room, RoomPlayer.user, RoomPlayer.slot_index, RoomPlayer.joined_at]
+    column_labels = {
+        "room": "Room",
+        "user": "Player",
+        "slot_index": "Slot Index",
+        "joined_at": "Joined At"
+    }
+
+class OTPRequestAdmin(ModelView, model=OTPRequest):
+    name = "OTP Request"
+    name_plural = "OTP Requests"
+    icon = "fa-solid fa-key"
+    column_list = [OTPRequest.email, OTPRequest.otp_code, OTPRequest.created_at, OTPRequest.expires_at]
+    column_searchable_list = [OTPRequest.email]
+    column_labels = {
+        "email": "Email Address",
+        "otp_code": "OTP Code",
+        "created_at": "Sent At",
+        "expires_at": "Expires At"
+    }
+
+admin.add_view(GuestUserAdmin)
+admin.add_view(RoomAdmin)
+admin.add_view(RoomPlayerAdmin)
+admin.add_view(OTPRequestAdmin)
+
+
 
 # Helper to generate unique room code
 def generate_room_code(db: Session) -> str:
