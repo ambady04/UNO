@@ -15,8 +15,25 @@ import {
   getUserProfile,
   checkEmail,
   loginWithPassword,
+  loginWithGoogle,
   HistoryResponse,
 } from "./api";
+
+function parseJwt(token: string) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 function getAbsoluteAvatarUrl(url: string | null) {
   if (!url) return null;
@@ -130,9 +147,11 @@ function HomeContent() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
 
   // On mount, check if guest is registered.
   useEffect(() => {
+    setIsMounted(true);
     if (typeof window !== "undefined") {
       const msg = localStorage.getItem("uno_kicked_message");
       if (msg) {
@@ -163,7 +182,106 @@ function HomeContent() {
         router.replace(`/room/${redirectCode.toUpperCase()}`);
       }
     }
+
+    // Check OAuth redirect hash
+    if (typeof window !== "undefined" && window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const idToken = params.get("id_token");
+      if (idToken) {
+        const payload = parseJwt(idToken);
+        if (payload && payload.email) {
+          loginWithGoogle(payload.email, payload.name, payload.picture)
+            .then((user) => {
+              setGuest({ token: user.token, nickname: user.nickname });
+              setProfileAvatarUrl(user.avatar_url);
+              window.history.replaceState(null, "", window.location.pathname);
+              if (redirectCode) {
+                router.push(`/room/${redirectCode.toUpperCase()}`);
+              }
+            })
+            .catch((err) => setError(err.message || "Google Sign-In failed."));
+        }
+      }
+    }
+
+    // Load Google Identity Services script
+    if (typeof window !== "undefined" && !(window as any).google) {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
   }, []);
+
+  const handleGoogleSignIn = () => {
+    setError("");
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "48110656581-sa9iuof88lcfkmooh7n5i1p31dgu75m0.apps.googleusercontent.com";
+
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+      const google = (window as any).google;
+      google.accounts.id.initialize({
+        client_id: googleClientId,
+        auto_select: true,
+        callback: async (response: any) => {
+          if (response.credential) {
+            try {
+              setLoading(true);
+              const payload = parseJwt(response.credential);
+              if (payload && payload.email) {
+                const user = await loginWithGoogle(payload.email, payload.name, payload.picture);
+                setGuest({ token: user.token, nickname: user.nickname });
+                setProfileAvatarUrl(user.avatar_url);
+                if (redirectCode) {
+                  router.push(`/room/${redirectCode.toUpperCase()}`);
+                }
+              }
+            } catch (err: any) {
+              setError(err.message || "Google Sign-In failed.");
+            } finally {
+              setLoading(false);
+            }
+          }
+        },
+      });
+
+      google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // Fallback to token client popup if One-Tap is dismissed by browser
+          if (google.accounts?.oauth2) {
+            const tokenClient = google.accounts.oauth2.initTokenClient({
+              client_id: googleClientId,
+              scope: "openid email profile",
+              callback: async (tokenResponse: any) => {
+                if (tokenResponse.access_token) {
+                  try {
+                    setLoading(true);
+                    const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                      headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                    });
+                    const googleUser = await res.json();
+                    if (googleUser.email) {
+                      const user = await loginWithGoogle(googleUser.email, googleUser.name, googleUser.picture);
+                      setGuest({ token: user.token, nickname: user.nickname });
+                      setProfileAvatarUrl(user.avatar_url);
+                      if (redirectCode) {
+                        router.push(`/room/${redirectCode.toUpperCase()}`);
+                      }
+                    }
+                  } catch (err: any) {
+                    setError(err.message || "Google Sign-In failed.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }
+              },
+            });
+            tokenClient.requestAccessToken();
+          }
+        }
+      });
+    }
+  };
 
   const handleEmailChange = (val: string) => {
     setEmail(val);
@@ -349,9 +467,26 @@ function HomeContent() {
   }
 
   function handleLogOut() {
-    localStorage.removeItem("uno_guest_token");
-    localStorage.removeItem("uno_guest_nickname");
-    localStorage.removeItem("uno_guest_avatar");
+    // Clear all LocalStorage and SessionStorage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Clear all cookies
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+    });
+
+    // Disable Google session auto-select if SDK is active
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.disableAutoSelect();
+      } catch (e) {
+        console.log("Google disableAutoSelect error:", e);
+      }
+    }
+
     setGuest(null);
     setNickname("");
     setEditNickname("");
@@ -365,6 +500,9 @@ function HomeContent() {
     setLoginWithOtpInstead(false);
     setOtpSent(false);
     setProfileAvatarUrl(null);
+
+    // Hard redirect to clear in-memory cache
+    window.location.href = "/";
   }
 
   async function handleCreateRoom() {
@@ -397,6 +535,12 @@ function HomeContent() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const isAuthPending = isMounted && typeof window !== "undefined" && window.location.hash.includes("id_token");
+
+  if (isAuthPending && !guest) {
+    return null;
   }
 
   return (
@@ -555,6 +699,43 @@ function HomeContent() {
                   </div>
                   <button type="submit" className="btn-primary" disabled={loading}>
                     {loading ? "Checking..." : "Continue"}
+                  </button>
+
+                  <div style={{ display: "flex", alignItems: "center", margin: "20px 0 16px 0", color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                    <span style={{ padding: "0 10px", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>OR</span>
+                    <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.15)" }} />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={loading}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      background: "#ffffff",
+                      color: "#3c4043",
+                      border: "1px solid #dadce0",
+                      borderRadius: 12,
+                      padding: "10px 16px",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                    </svg>
+                    Sign in with Google
                   </button>
                 </form>
               ) : emailExists && hasPassword && !loginWithOtpInstead ? (
