@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
-from database import get_db, clean_old_rooms_helper, engine
+from database import get_db, clean_old_rooms_helper, engine, SessionLocal
 from models import GuestUser, Room, RoomPlayer, OTPRequest
 from sqladmin import Admin, ModelView
 from markupsafe import Markup
@@ -324,7 +324,7 @@ def google_auth(request: Request, payload: dict, db: Session = Depends(get_db)):
         user.is_registered = True
         if not user.nickname:
             user.nickname = nickname
-        if not user.avatar and fetched_avatar:
+        if fetched_avatar:
             user.avatar = fetched_avatar
         db.commit()
         db.refresh(user)
@@ -490,18 +490,22 @@ async def user_profile_post(
 @app.post("/api/rooms/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
 def room_create(request: Request, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
     clean_old_rooms_helper(db)
-    code = generate_room_code(db)
-    room = Room(code=code, host_id=user.token, status='LOBBY')
-    db.add(room)
-    db.commit()
-    db.refresh(room)
-    
-    player = RoomPlayer(room_id=room.id, user_id=user.token, slot_index=0)
-    db.add(player)
-    db.commit()
-    db.refresh(room)
-    
-    return serialize_room(room, get_base_url(request))
+    try:
+        code = generate_room_code(db)
+        room = Room(code=code, host_id=user.token, status='LOBBY')
+        db.add(room)
+        db.commit()
+        db.refresh(room)
+        
+        player = RoomPlayer(room_id=room.id, user_id=user.token, slot_index=0)
+        db.add(player)
+        db.commit()
+        db.refresh(room)
+        
+        return serialize_room(room, get_base_url(request))
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create room: {str(e)}")
 
 @app.post("/api/rooms/{code}/join/", response_model=RoomResponse)
 def room_join(request: Request, code: str, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -605,7 +609,6 @@ def reset_room_in_db_sync(db: Session, room_code: str, host_token: str) -> list:
     return db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.slot_index).all()
 
 
-@app.websocket("/ws/room/{room_code}/")
 @app.websocket("/ws/room/{room_code}")
 async def websocket_endpoint(websocket: WebSocket, room_code: str, token: Optional[str] = None):
     # Verify auth
@@ -629,6 +632,16 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, token: Option
         room_code = room_code.upper()
         # Verify player is associated with this room in DB
         is_member = verify_websocket_membership_sync(db, room_code, str(user.token))
+        if not is_member:
+            room = db.query(Room).filter(Room.code == room_code).first()
+            if room and room.status == 'LOBBY':
+                db_players_count = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).count()
+                if db_players_count < 4:
+                    new_rp = RoomPlayer(room_id=room.id, user_id=user.token, slot_index=db_players_count)
+                    db.add(new_rp)
+                    db.commit()
+                    is_member = True
+                    
         if not is_member:
             await websocket.close(code=4002)
             return
@@ -689,6 +702,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, token: Option
                 for p in state['players']:
                     if p['id'] == str(user.token):
                         p['is_connected'] = is_connected
+                        p['name'] = user.nickname
+                        p['avatar_url'] = get_avatar_url_helper(user.avatar, str(websocket.base_url))
                         found = True
                         break
                         

@@ -39,12 +39,17 @@ def get_avatar_url_helper(avatar_path: Optional[str], base_url: str) -> Optional
         return None
     if avatar_path.startswith("http://") or avatar_path.startswith("https://"):
         return avatar_path
-    # Avatar path can be e.g. "avatars/my_image.png"
-    # Ensure it's not double prefixed
+    
+    clean_base = str(base_url).rstrip('/')
+    if clean_base.startswith("ws://"):
+        clean_base = "http://" + clean_base[5:]
+    elif clean_base.startswith("wss://"):
+        clean_base = "https://" + clean_base[6:]
+        
     clean_path = avatar_path.lstrip("/")
     if not clean_path.startswith("media/"):
         clean_path = f"media/{clean_path}"
-    return f"{base_url.rstrip('/')}/{clean_path}"
+    return f"{clean_base}/{clean_path}"
 
 
 def serialize_guest_user(user, base_url: str) -> GuestUserResponse:

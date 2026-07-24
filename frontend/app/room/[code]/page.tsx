@@ -15,8 +15,9 @@ import { gameSounds } from "../../sounds";
 function getAbsoluteAvatarUrl(url: string | null) {
   if (!url) return null;
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  return `${BASE_URL}${url}`;
+  const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+  const cleanPath = url.startsWith("/") ? url : `/${url}`;
+  return `${BASE_URL}${cleanPath}`;
 }
 
 const QUICK_CHAT_OPTIONS = [
@@ -109,6 +110,7 @@ export default function RoomPage() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [flyingCardData, setFlyingCardData] = useState<{
     card: string;
@@ -499,8 +501,10 @@ export default function RoomPage() {
       socketRef.current = null;
     }
 
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
-    const wsUrl = `${wsBase}/ws/room/${roomCode}/?token=${token}`;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const defaultWsBase = apiBase.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+    const wsBase = process.env.NEXT_PUBLIC_WS_URL || defaultWsBase;
+    const wsUrl = `${wsBase}/ws/room/${roomCode}?token=${token}`;
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
@@ -633,9 +637,21 @@ export default function RoomPage() {
         `WebSocket closed. Code: ${event.code}, Reason: ${event.reason || "none"}`,
       );
 
-      // Don't reconnect on explicit close codes (auth failure, kicked, unmounted)
-      if (isUnmountedRef.current || event.code === 4001 || event.code === 4002)
+      if (isUnmountedRef.current) return;
+
+      if (event.code === 4001) {
+        localStorage.removeItem("uno_guest_token");
+        localStorage.removeItem("uno_guest_nickname");
+        showAlert("Session expired. Redirecting to home...");
+        setTimeout(() => router.push(`/?redirect=${roomCode}`), 1500);
         return;
+      }
+
+      if (event.code === 4002) {
+        showAlert("Room is unavailable or has ended.");
+        setTimeout(() => router.push("/"), 2000);
+        return;
+      }
 
       // Exponential backoff reconnect: 1s, 2s, 4s, 8s, max 10s
       const delay = Math.min(
@@ -659,7 +675,7 @@ export default function RoomPage() {
     };
 
     ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
+      console.warn("WebSocket reconnecting...");
     };
   }
 
@@ -880,6 +896,8 @@ export default function RoomPage() {
   }
 
   function copyInviteLink() {
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2000);
     if (typeof window !== "undefined") {
       const plainText = `You've been invited to join an UNO game session — and trust me, you don't want to miss this one.\n\nRoom Code: ${roomCode}\nJoin here: ${window.location.href}\n\nGrab your seat before someone else takes it. See you at the table! 🎴`;
 
@@ -1539,9 +1557,15 @@ export default function RoomPage() {
             <button
               onClick={copyInviteLink}
               className="btn-secondary"
-              style={{ padding: "6px 12px", fontSize: 12, minHeight: 32 }}
+              style={{
+                padding: "6px 12px",
+                fontSize: 12,
+                minHeight: 32,
+                transition: "all 0.2s ease",
+                ...(copiedInvite ? { background: "rgba(16,185,129,0.2)", borderColor: "#10b981", color: "#10b981", fontWeight: 700 } : {})
+              }}
             >
-              Invite
+              {copiedInvite ? "✓ Copied!" : "Invite"}
             </button>
             <button
               onClick={() => {
@@ -1682,7 +1706,12 @@ export default function RoomPage() {
                     {p.avatar_url ? (
                       <img
                         src={getAbsoluteAvatarUrl(p.avatar_url) || ""}
-                        alt="Avatar"
+                        alt={p.name}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "flex";
+                        }}
                         style={{
                           width: 28,
                           height: 28,
@@ -1692,23 +1721,22 @@ export default function RoomPage() {
                           boxShadow: "0 0 6px rgba(51,136,255,0.3)"
                         }}
                       />
-                    ) : (
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: "50%",
-                          background: "rgba(255,255,255,0.08)",
-                          border: "1px dashed rgba(255,255,255,0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 12
-                        }}
-                      >
-                        👤
-                      </div>
-                    )}
+                    ) : null}
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px dashed rgba(255,255,255,0.2)",
+                        display: p.avatar_url ? "none" : "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12
+                      }}
+                    >
+                      👤
+                    </div>
                     <strong>{p.name}</strong>
                     {p.id === guest?.token && (
                       <span
@@ -1820,9 +1848,15 @@ export default function RoomPage() {
                 <button
                   onClick={copyInviteLink}
                   className="btn-secondary"
-                  style={{ flex: 1, minHeight: 44, minWidth: 0 }}
+                  style={{
+                    flex: 1,
+                    minHeight: 44,
+                    minWidth: 0,
+                    transition: "all 0.2s ease",
+                    ...(copiedInvite ? { background: "rgba(16,185,129,0.2)", borderColor: "#10b981", color: "#10b981", fontWeight: 700 } : {})
+                  }}
                 >
-                  Invite
+                  {copiedInvite ? "✓ Copied!" : "Invite"}
                 </button>
                 <button
                   onClick={() => {
@@ -2190,12 +2224,8 @@ export default function RoomPage() {
                     marginTop: 4,
                     marginBottom: 4,
                     pointerEvents: "none",
-                    zIndex: 10,
                   }}
                 >
-                  🎴 No playable cards — draw from the deck!
-                </div>
-              )}   )}  >
                   🎴 No playable cards — draw from the deck!
                 </div>
               )}
