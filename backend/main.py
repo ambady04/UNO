@@ -94,13 +94,19 @@ class GuestUserAdmin(ModelView, model=GuestUser):
     def _format_avatar(model, attribute):
         val = getattr(model, attribute, None)
         if not val:
-            return "No Avatar"
-        url = f"/media/{val}" if not str(val).startswith("media/") else f"/{val}"
+            return Markup(
+                '<div style="width: 38px; height: 38px; border-radius: 50%; background: #334155; display: inline-flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 18px;">👤</div>'
+            )
+        val_str = str(val).strip()
+        if val_str.startswith("http://") or val_str.startswith("https://"):
+            url = val_str
+        elif val_str.startswith("media/"):
+            url = f"/{val_str}"
+        else:
+            url = f"/media/{val_str}"
+
         return Markup(
-            f'<a href="{url}" target="_blank" title="Click to view full image" style="color: #0066cc; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 8px;">'
-            f'<img src="{url}" style="height: 36px; width: 36px; border-radius: 50%; object-fit: cover; border: 1.5px solid #0066cc; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" />'
-            f'<span>{val} ↗</span>'
-            f'</a>'
+            f'<img src="{url}" style="height: 38px; width: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; box-shadow: 0 2px 8px rgba(0,0,0,0.25);" alt="Avatar" />'
         )
 
     column_formatters = {
