@@ -31,14 +31,18 @@ from auth import get_current_user, make_password, check_password
 from websocket_manager import manager
 from game.state_manager import GameStateManager, VersionMismatchError
 from game import game_logic
+from supabase_storage import upload_avatar_to_supabase, delete_avatar_from_supabase
 
 app = FastAPI(
     title="UNO Multiplayer API",
     version="1.0.0",
 )
 
-# Auto-create database tables on startup
-Base.metadata.create_all(bind=engine)
+# Auto-create database tables on startup (safely wrapped for serverless environments)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Startup table creation skipped/warning: {e}")
 
 # Configure CORS to allow all origins as in settings.CORS_ALLOW_ALL_ORIGINS = True
 app.add_middleware(
@@ -49,13 +53,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure Media folders exist
+# Safely handle local media folder for local development
 MEDIA_DIR = Path("media")
 AVATARS_DIR = MEDIA_DIR / "avatars"
-AVATARS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Mount media directory to serve uploads
-app.mount("/media", StaticFiles(directory="media"), name="media")
+try:
+    AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+    if MEDIA_DIR.exists():
+        app.mount("/media", StaticFiles(directory="media"), name="media")
+except Exception as e:
+    print(f"Local media directory setup skipped (serverless environment): {e}")
 
 @app.get("/")
 def root():
@@ -287,14 +293,12 @@ def auto_fetch_email_avatar(email: str, google_picture_url: Optional[str] = None
         try:
             res = httpx.get(google_picture_url, timeout=4.0)
             if res.status_code == 200 and len(res.content) > 100:
-                ext = "png"
-                content_type = res.headers.get("content-type", "")
-                if "jpeg" in content_type or "jpg" in content_type:
-                    ext = "jpg"
-                fname = f"avatars/google_{uuid.uuid4().hex[:12]}.{ext}"
-                filepath = MEDIA_DIR / fname
-                filepath.write_bytes(res.content)
-                return fname
+                content_type = res.headers.get("content-type", "image/png")
+                try:
+                    return upload_avatar_to_supabase(res.content, content_type, filename_hint="google_avatar.png")
+                except Exception as se:
+                    print("Supabase Storage upload warning for Google avatar:", se)
+                    return google_picture_url
         except Exception as e:
             print("Google avatar download exception:", e)
             return google_picture_url
@@ -304,10 +308,11 @@ def auto_fetch_email_avatar(email: str, google_picture_url: Optional[str] = None
         gravatar_url = f"https://www.gravatar.com/avatar/{email_hash}?d=404&s=256"
         res = httpx.get(gravatar_url, timeout=3.0, follow_redirects=True)
         if res.status_code == 200 and len(res.content) > 100:
-            fname = f"avatars/gravatar_{uuid.uuid4().hex[:12]}.jpg"
-            filepath = MEDIA_DIR / fname
-            filepath.write_bytes(res.content)
-            return fname
+            try:
+                return upload_avatar_to_supabase(res.content, "image/jpeg", filename_hint="gravatar.jpg")
+            except Exception as se:
+                print("Supabase Storage upload warning for Gravatar:", se)
+                return gravatar_url
     except Exception as e:
         print("Gravatar fetch exception:", e)
 
@@ -456,13 +461,28 @@ async def user_profile_post(
         user.nickname = nickname
         
     if avatar:
-        # Save file to media/avatars
-        file_ext = avatar.filename.split('.')[-1]
-        unique_filename = f"{uuid.uuid4()}.{file_ext}"
-        file_path = AVATARS_DIR / unique_filename
-        with open(file_path, "wb") as f:
-            f.write(await avatar.read())
-        user.avatar = f"avatars/{unique_filename}"
+        file_bytes = await avatar.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded avatar file is empty.")
+        if len(file_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Avatar file size exceeds maximum limit of 5MB.")
+            
+        old_avatar = user.avatar
+        try:
+            new_avatar_url = upload_avatar_to_supabase(
+                file_bytes=file_bytes,
+                content_type=avatar.content_type or "",
+                filename_hint=avatar.filename or "avatar.png"
+            )
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+        except Exception as se:
+            print(f"Supabase Storage Upload Error for user {user.token}: {se}")
+            raise HTTPException(status_code=500, detail="Failed to upload avatar to cloud storage.")
+            
+        user.avatar = new_avatar_url
+        if old_avatar and old_avatar != new_avatar_url:
+            delete_avatar_from_supabase(old_avatar)
         
     db.commit()
     db.refresh(user)

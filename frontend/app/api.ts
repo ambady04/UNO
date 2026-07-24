@@ -223,7 +223,7 @@ export async function updateUserProfile(nickname: string, avatarFile?: File): Pr
   });
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || 'Failed to update profile.');
+    throw new Error(err.detail || err.error || 'Failed to update profile.');
   }
   const data: ProfileResponse = await res.json();
   setStoredGuest(data.token, data.nickname);
