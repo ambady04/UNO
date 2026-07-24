@@ -11,10 +11,10 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db, clean_old_rooms_helper, engine, SessionLocal
 from models import Base, GuestUser, Room, RoomPlayer, OTPRequest
@@ -298,7 +298,6 @@ def guest_register(request: Request, payload: dict, db: Session = Depends(get_db
 
 @app.post("/api/auth/send-otp/")
 def send_otp(payload: dict, db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
     email = payload.get('email', '').strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required.")
@@ -349,7 +348,6 @@ def auto_fetch_email_avatar(email: str, google_picture_url: Optional[str] = None
 
 @app.post("/api/auth/google/", response_model=GuestUserResponse)
 def google_auth(request: Request, payload: dict, db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
     email = payload.get('email', '').strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required.")
@@ -383,7 +381,6 @@ def google_auth(request: Request, payload: dict, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/verify-otp/")
 def verify_otp(request: Request, payload: dict, db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
     email = payload.get('email', '').strip().lower()
     code = payload.get('otp', '').strip()
     nickname = payload.get('nickname', '').strip() or email.split('@')[0]
@@ -543,42 +540,64 @@ async def user_profile_post(
     return serialize_guest_user(user, get_base_url(request))
 
 @app.post("/api/rooms/", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)
-def room_create(request: Request, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
+def room_create(request: Request, response: Response, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    t_start = time.perf_counter()
     try:
+        t_code_start = time.perf_counter()
         code = generate_room_code(db)
+        t_code_end = time.perf_counter()
+
+        t_db_start = time.perf_counter()
         room = Room(code=code, host_id=user.token, status='LOBBY')
         db.add(room)
-        db.commit()
-        db.refresh(room)
+        db.flush()  # Assigns room.id without extra DB commit round-trip
         
         player = RoomPlayer(room_id=room.id, user_id=user.token, slot_index=0)
         db.add(player)
-        db.commit()
-        db.refresh(room)
-        
+        db.commit() # Single atomic commit for both Room and RoomPlayer
+        t_db_end = time.perf_counter()
+
+        # In-memory relationship linking to avoid lazy-loading SELECT queries
+        room.host = user
+        room.players_relations = [player]
+        player.room = room
+        player.user = user
+
+        t_total_end = time.perf_counter()
+        code_ms = round((t_code_end - t_code_start) * 1000, 2)
+        db_ms = round((t_db_end - t_db_start) * 1000, 2)
+        total_ms = round((t_total_end - t_start) * 1000, 2)
+
+        response.headers["Server-Timing"] = f"code;dur={code_ms}, db;dur={db_ms}, total;dur={total_ms}"
+        print(f"[PERF] room_create | code_gen: {code_ms}ms | db_commit: {db_ms}ms | total: {total_ms}ms | room: {code}")
+
         return serialize_room(room, get_base_url(request))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Failed to create room: {str(e)}")
 
 @app.post("/api/rooms/{code}/join/", response_model=RoomResponse)
-def room_join(request: Request, code: str, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
+def room_join(request: Request, response: Response, code: str, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    t_start = time.perf_counter()
     code = code.upper()
-    room = db.query(Room).filter(Room.code == code).first()
+    room = (
+        db.query(Room)
+        .options(joinedload(Room.host), joinedload(Room.players_relations).joinedload(RoomPlayer.user))
+        .filter(Room.code == code)
+        .first()
+    )
     if not room:
         raise HTTPException(status_code=404, detail="Room not found.")
         
     # Check if already in room
-    player_exists = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id, RoomPlayer.user_id == user.token).first()
+    player_exists = any(rp.user_id == user.token for rp in room.players_relations)
     if player_exists:
         return serialize_room(room, get_base_url(request))
         
     if room.status != 'LOBBY':
         raise HTTPException(status_code=400, detail="Game has already started or finished.")
         
-    current_players_count = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).count()
+    current_players_count = len(room.players_relations)
     if current_players_count >= 10:
         raise HTTPException(status_code=400, detail="Room is full (maximum 10 players).")
         
@@ -587,17 +606,33 @@ def room_join(request: Request, code: str, user: GuestUser = Depends(get_current
     db.add(player)
     db.commit()
     db.refresh(room)
-    
+
+    t_total_end = time.perf_counter()
+    total_ms = round((t_total_end - t_start) * 1000, 2)
+    response.headers["Server-Timing"] = f"total;dur={total_ms}"
+
     return serialize_room(room, get_base_url(request))
 
 @app.get("/api/rooms/{code}/", response_model=RoomResponse)
-def room_detail(request: Request, code: str, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    clean_old_rooms_helper(db)
+def room_detail(request: Request, response: Response, code: str, user: GuestUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    t_start = time.perf_counter()
     code = code.upper()
-    room = db.query(Room).filter(Room.code == code).first()
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found.")
+    room = (
+        db.query(Room)
+        .options(joinedload(Room.host), joinedload(Room.players_relations).joinedload(RoomPlayer.user))
+        .filter(Room.code == code)
+        .first()
+    )
+    t_total_end = time.perf_counter()
+    total_ms = round((t_total_end - t_start) * 1000, 2)
+    response.headers["Server-Timing"] = f"total;dur={total_ms}"
+
     return serialize_room(room, get_base_url(request))
+
+@app.api_route("/api/cron/cleanup/", methods=["GET", "POST"])
+def cron_cleanup(db: Session = Depends(get_db)):
+    clean_old_rooms_helper(db)
+    return {"status": "ok", "message": "Expired rooms and OTPs cleaned up successfully."}
 
 
 # WebSocket Connection Helper
