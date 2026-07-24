@@ -91,7 +91,7 @@ class GuestUserAdmin(ModelView, model=GuestUser):
         "created_at": "Created At"
     }
 
-    def _format_avatar(model, attribute):
+    def _format_avatar_list(model, attribute):
         val = getattr(model, attribute, None)
         if not val:
             return Markup(
@@ -109,11 +109,34 @@ class GuestUserAdmin(ModelView, model=GuestUser):
             f'<img src="{url}" style="height: 38px; width: 38px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; box-shadow: 0 2px 8px rgba(0,0,0,0.25);" alt="Avatar" />'
         )
 
+    def _format_avatar_detail(model, attribute):
+        val = getattr(model, attribute, None)
+        if not val:
+            return "No Avatar"
+        val_str = str(val).strip()
+        if val_str.startswith("http://") or val_str.startswith("https://"):
+            url = val_str
+        elif val_str.startswith("media/"):
+            url = f"/{val_str}"
+        else:
+            url = f"/media/{val_str}"
+
+        return Markup(
+            f'<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin: 4px 0;">'
+            f'<a href="{url}" target="_blank" title="Click to view high-res image in new tab">'
+            f'<img src="{url}" style="width: 180px; height: 180px; border-radius: 16px; object-fit: cover; border: 3px solid #38bdf8; box-shadow: 0 4px 16px rgba(0,0,0,0.25); background: #0f172a;" />'
+            f'</a>'
+            f'<a href="{url}" target="_blank" style="color: #0284c7; background: #e0f2fe; border: 1px solid #bae6fd; padding: 7px 14px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">'
+            f'🔍 Open Full Image File ↗'
+            f'</a>'
+            f'</div>'
+        )
+
     column_formatters = {
-        GuestUser.avatar: _format_avatar
+        GuestUser.avatar: _format_avatar_list
     }
     column_formatters_detail = {
-        GuestUser.avatar: _format_avatar
+        GuestUser.avatar: _format_avatar_detail
     }
 
 class RoomAdmin(ModelView, model=Room):
