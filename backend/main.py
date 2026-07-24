@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from database import get_db, clean_old_rooms_helper, engine, SessionLocal
-from models import GuestUser, Room, RoomPlayer, OTPRequest
+from models import Base, GuestUser, Room, RoomPlayer, OTPRequest
 from sqladmin import Admin, ModelView
 from markupsafe import Markup
 from schemas import (
@@ -32,7 +32,13 @@ from websocket_manager import manager
 from game.state_manager import GameStateManager, VersionMismatchError
 from game import game_logic
 
-app = FastAPI(title="UNO! Multiplayer API")
+app = FastAPI(
+    title="UNO Multiplayer API",
+    version="1.0.0",
+)
+
+# Auto-create database tables on startup
+Base.metadata.create_all(bind=engine)
 
 # Configure CORS to allow all origins as in settings.CORS_ALLOW_ALL_ORIGINS = True
 app.add_middleware(
