@@ -14,7 +14,11 @@ MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB limit
 
 def get_supabase_config():
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    service_key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY", "") or
+        os.getenv("SUPABASE_KEY", "") or
+        os.getenv("SUPABASE_ANON_KEY", "")
+    ).strip()
     bucket = os.getenv("SUPABASE_AVATAR_BUCKET", "avatars").strip()
     return supabase_url, service_key, bucket
 
@@ -51,7 +55,10 @@ def upload_avatar_to_supabase(file_bytes: bytes, content_type: str, filename_hin
         raise RuntimeError("Supabase credentials (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) are not configured.")
 
     endpoint_url = f"{supabase_url}/storage/v1/object/{bucket}/{unique_filename}"
+    
+    # Primary headers sending both apikey and Bearer authorization
     headers = {
+        "apikey": service_key,
         "Authorization": f"Bearer {service_key}",
         "Content-Type": content_type_clean,
         "x-upsert": "true"
@@ -59,6 +66,16 @@ def upload_avatar_to_supabase(file_bytes: bytes, content_type: str, filename_hin
 
     try:
         response = httpx.post(endpoint_url, headers=headers, content=file_bytes, timeout=10.0)
+        
+        # If Kong returns Invalid Compact JWS (occurs with non-JWT secret keys), retry with apikey header only
+        if response.status_code in (400, 401, 403) and "Invalid Compact JWS" in response.text:
+            headers_fallback = {
+                "apikey": service_key,
+                "Content-Type": content_type_clean,
+                "x-upsert": "true"
+            }
+            response = httpx.post(endpoint_url, headers=headers_fallback, content=file_bytes, timeout=10.0)
+
     except Exception as e:
         raise RuntimeError(f"Failed to connect to Supabase Storage: {str(e)}")
 
@@ -91,6 +108,7 @@ def delete_avatar_from_supabase(avatar_url: Optional[str]) -> bool:
 
     endpoint_url = f"{supabase_url}/storage/v1/object/{bucket}"
     headers = {
+        "apikey": service_key,
         "Authorization": f"Bearer {service_key}",
         "Content-Type": "application/json"
     }
@@ -98,6 +116,12 @@ def delete_avatar_from_supabase(avatar_url: Optional[str]) -> bool:
 
     try:
         response = httpx.request("DELETE", endpoint_url, headers=headers, json=payload, timeout=5.0)
+        if response.status_code in (400, 401, 403) and "Invalid Compact JWS" in response.text:
+            headers_fallback = {
+                "apikey": service_key,
+                "Content-Type": "application/json"
+            }
+            response = httpx.request("DELETE", endpoint_url, headers=headers_fallback, json=payload, timeout=5.0)
         return response.status_code in (200, 204)
     except Exception as e:
         print(f"Non-critical: Failed to delete old avatar from Supabase Storage: {e}")
