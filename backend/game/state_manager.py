@@ -6,9 +6,13 @@ from .game_logic import check_deck_integrity, resolve_turn_timeout
 
 import os
 
-# Connect to Redis using environment variables
-redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
-redis_client = redis.Redis.from_url(redis_url, decode_responses=True, protocol=2)
+# Connect to Redis using environment variables (supports redis:// and rediss:// for Upstash)
+redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0").strip()
+try:
+    redis_client = redis.Redis.from_url(redis_url, decode_responses=True, protocol=2)
+except Exception as e:
+    print(f"Redis initialization warning: {e}")
+    redis_client = redis.Redis.from_url("redis://127.0.0.1:6379/0", decode_responses=True, protocol=2)
 
 class VersionMismatchError(ValueError):
     pass

@@ -13,7 +13,7 @@ class GuestUser(Base):
     nickname = Column(String(50), nullable=False)
     email = Column(String(254), unique=True, nullable=True)
     is_registered = Column(Boolean, default=False, nullable=False)
-    avatar = Column(String(100), nullable=True)
+    avatar = Column(String(500), nullable=True)
     password_hash = Column(String(128), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
