@@ -34,19 +34,22 @@ ROOM_EXPIRY_HOURS = 2
 
 def clean_old_rooms_helper(db: Session):
     """
-    Cleanup expired database records.
+    Cleanup expired database records safely.
     - Deletes expired OTP requests.
     - Deletes rooms older than ROOM_EXPIRY_HOURS.
-    - RoomPlayer records are deleted automatically due to CASCADE.
     """
-    from models import OTPRequest, Room
-    now = datetime.utcnow()
+    try:
+        from models import OTPRequest, Room
+        now = datetime.utcnow()
 
-    # Delete expired OTPs
-    db.query(OTPRequest).filter(OTPRequest.expires_at <= now).delete()
+        # Delete expired OTPs
+        db.query(OTPRequest).filter(OTPRequest.expires_at <= now).delete(synchronize_session=False)
 
-    # Delete expired rooms
-    room_threshold = now - timedelta(hours=ROOM_EXPIRY_HOURS)
-    db.query(Room).filter(Room.created_at <= room_threshold).delete()
-    
-    db.commit()
+        # Delete expired rooms
+        room_threshold = now - timedelta(hours=ROOM_EXPIRY_HOURS)
+        db.query(Room).filter(Room.created_at <= room_threshold).delete(synchronize_session=False)
+        
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("clean_old_rooms_helper exception handled:", e)
