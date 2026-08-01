@@ -44,10 +44,10 @@ try:
 except Exception as e:
     print(f"Startup table creation skipped/warning: {e}")
 
-# Configure CORS to allow all origins as in settings.CORS_ALLOW_ALL_ORIGINS = True
+# Configure CORS to allow origins dynamically with credentials support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -699,6 +699,237 @@ def reset_room_in_db_sync(db: Session, room_code: str, host_token: str) -> list:
     return db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.slot_index).all()
 
 
+async def process_game_action_core(
+    db: Session,
+    state_manager: GameStateManager,
+    room_code: str,
+    user: GuestUser,
+    action: str,
+    data: dict,
+    event_id: Optional[str],
+    client_version: Optional[int],
+    base_url: str
+):
+    room_was_closed_by_host = False
+    with state_manager.lock_room(room_code):
+        state = state_manager.get_state(room_code)
+        if not state:
+            room = db.query(Room).filter(Room.code == room_code).first()
+            if not room:
+                raise ValueError("Room not found.")
+            db_players = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.slot_index).all()
+            players_list = []
+            for p in db_players:
+                players_list.append({
+                    'id': str(p.user.token),
+                    'name': p.user.nickname,
+                    'is_connected': True,
+                    'called_uno': False,
+                    'avatar_url': get_avatar_url_helper(p.user.avatar, base_url)
+                })
+            state = {
+                'room_code': room_code,
+                'game_status': 'LOBBY',
+                'version': 0,
+                'players': players_list,
+                'hands': {},
+                'deck': [],
+                'discard_pile': ['R_0'],
+                'current_turn': 0,
+                'direction': 1
+            }
+
+        state_manager.verify_client_version(state, client_version)
+
+        if action == 'start_game':
+            if state.get('game_status') == 'PLAYING':
+                raise ValueError("Game has already started.")
+            db_players = start_game_in_db_sync(db, room_code, str(user.token))
+
+            for p in state.get('players', []):
+                p['is_connected'] = True
+
+            players_data = [
+                {
+                    "id": str(dp.user.token),
+                    "name": dp.user.nickname,
+                    "avatar_url": get_avatar_url_helper(dp.user.avatar, base_url)
+                } for dp in db_players
+            ]
+
+            lobby_version = state.get('version', 0)
+            state = game_logic.initialize_game(players_data)
+            state['room_code'] = room_code
+            state['version'] = lobby_version
+
+        elif action == 'play_card':
+            card = data.get('card')
+            chosen_color = data.get('chosen_color')
+            state = game_logic.handle_play_card(state, str(user.token), card, chosen_color)
+
+        elif action == 'draw_card':
+            state = game_logic.handle_draw_card(state, str(user.token))
+
+        elif action == 'pass_turn':
+            state = game_logic.handle_pass_turn(state, str(user.token))
+
+        elif action == 'call_uno':
+            state = game_logic.handle_call_uno(state, str(user.token))
+
+        elif action == 'call_out_uno':
+            target_id = data.get('target_id')
+            state = game_logic.handle_call_out_uno(state, str(user.token), target_id)
+
+        elif action == 'kick_player':
+            target_id = data.get('target_id')
+            delete_room_player_sync(db, room_code, str(user.token), target_id)
+            state = state_manager.kick_player_from_state(room_code, target_id)
+
+        elif action == 'leave_room':
+            room = db.query(Room).filter(Room.code == room_code).first()
+            if room and str(room.host_id) == str(user.token):
+                room_was_closed_by_host = True
+            delete_room_player_sync(db, room_code, str(user.token), str(user.token), is_leave=True)
+            state = state_manager.kick_player_from_state(room_code, str(user.token))
+
+        elif action == 'reset_to_lobby':
+            if state.get('game_status') not in ('FINISHED', 'PLAYING'):
+                raise ValueError("Game is not finished yet.")
+            db_players = reset_room_in_db_sync(db, room_code, str(user.token))
+            players_list = []
+            for p in db_players:
+                players_list.append({
+                    'id': str(p.user.token),
+                    'name': p.user.nickname,
+                    'is_connected': True,
+                    'called_uno': False,
+                    'avatar_url': get_avatar_url_helper(p.user.avatar, base_url)
+                })
+            state = {
+                'room_code': room_code,
+                'game_status': 'LOBBY',
+                'version': state.get('version', 0),
+                'players': players_list,
+                'hands': {},
+                'deck': [],
+                'discard_pile': ['R_0'],
+                'current_turn': 0,
+                'direction': 1
+            }
+        else:
+            raise ValueError(f"Unknown action type: {action}")
+
+        if state.get('game_status') == 'FINISHED' or room_was_closed_by_host:
+            finalize_game_in_db_sync(db, room_code)
+
+        updated_state = state_manager.save_state(room_code, state)
+        if event_id:
+            state_manager.mark_event_processed(room_code, event_id)
+
+    await manager.broadcast_room_state(room_code, updated_state)
+
+    if action == 'kick_player':
+        target_id = data.get('target_id')
+        await manager.broadcast_to_room(room_code, {
+            "type": "player_kicked",
+            "target_id": target_id,
+            "message": "You have been kicked by the host."
+        })
+    elif action == 'leave_room' and room_was_closed_by_host:
+        await manager.broadcast_to_room(room_code, {
+            "type": "room_closed",
+            "message": "The host has closed the room."
+        })
+
+    return updated_state
+
+
+@app.get("/api/rooms/{code}/state/")
+def get_room_state_http(
+    request: Request,
+    code: str,
+    user: GuestUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    code = code.upper()
+    state_manager = GameStateManager()
+    state = state_manager.get_state(code)
+    if not state:
+        room = db.query(Room).filter(Room.code == code).first()
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found.")
+        db_players = db.query(RoomPlayer).filter(RoomPlayer.room_id == room.id).order_by(RoomPlayer.slot_index).all()
+        players_list = []
+        for p in db_players:
+            players_list.append({
+                'id': str(p.user.token),
+                'name': p.user.nickname,
+                'is_connected': True,
+                'called_uno': False,
+                'avatar_url': get_avatar_url_helper(p.user.avatar, get_base_url(request))
+            })
+        state = {
+            'room_code': code,
+            'game_status': 'LOBBY',
+            'version': 0,
+            'players': players_list,
+            'hands': {},
+            'deck': [],
+            'discard_pile': ['R_0'],
+            'current_turn': 0,
+            'direction': 1
+        }
+        state_manager.save_state(code, state)
+
+    filtered = state_manager.filter_state_for_player(state, str(user.token))
+    return {
+        "type": "game_state_update",
+        "version": filtered.get("version", 0),
+        "state": filtered
+    }
+
+
+@app.post("/api/rooms/{code}/action/")
+async def post_room_action_http(
+    request: Request,
+    code: str,
+    payload: dict,
+    user: GuestUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    code = code.upper()
+    action = payload.get('type')
+    event_id = payload.get('event_id')
+    client_version = payload.get('client_version')
+    data = payload.get('data', {})
+
+    state_manager = GameStateManager()
+    try:
+        updated_state = await process_game_action_core(
+            db=db,
+            state_manager=state_manager,
+            room_code=code,
+            user=user,
+            action=action,
+            data=data,
+            event_id=event_id,
+            client_version=client_version,
+            base_url=get_base_url(request)
+        )
+        filtered = state_manager.filter_state_for_player(updated_state, str(user.token))
+        return {
+            "type": "game_state_update",
+            "version": filtered.get("version", 0),
+            "state": filtered
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except VersionMismatchError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
 @app.websocket("/ws/room/{room_code}")
 async def websocket_endpoint(websocket: WebSocket, room_code: str, token: Optional[str] = None):
     # Verify auth
@@ -852,117 +1083,17 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, token: Option
                     
                 # Process Action
                 try:
-                    room_was_closed_by_host = False
-                    
-                    with state_manager.lock_room(room_code):
-                        state = state_manager.get_state(room_code)
-                        if not state:
-                            state = initialize_lobby_state_sync()
-                            
-                        state_manager.verify_client_version(state, client_version)
-                        
-                        if action == 'start_game':
-                            if state.get('game_status') == 'PLAYING':
-                                raise ValueError("Game has already started.")
-                            db_players = start_game_in_db_sync(db, room_code, str(user.token))
-                            
-                            # Check online status of everyone
-                            for p in state.get('players', []):
-                                if not p.get('is_connected', False):
-                                    raise ValueError(f"Cannot start match. Player '{p['name']}' is offline.")
-                                    
-                            players_data = [
-                                {
-                                    "id": str(dp.user.token),
-                                    "name": dp.user.nickname,
-                                    "avatar_url": get_avatar_url_helper(dp.user.avatar, str(websocket.base_url))
-                                } for dp in db_players
-                            ]
-                            
-                            lobby_version = state.get('version', 0)
-                            state = game_logic.initialize_game(players_data)
-                            state['room_code'] = room_code
-                            state['version'] = lobby_version
-                            
-                        elif action == 'play_card':
-                            card = data.get('data', {}).get('card')
-                            chosen_color = data.get('data', {}).get('chosen_color')
-                            state = game_logic.handle_play_card(state, str(user.token), card, chosen_color)
-                            
-                        elif action == 'draw_card':
-                            state = game_logic.handle_draw_card(state, str(user.token))
-                            
-                        elif action == 'pass_turn':
-                            state = game_logic.handle_pass_turn(state, str(user.token))
-                            
-                        elif action == 'call_uno':
-                            state = game_logic.handle_call_uno(state, str(user.token))
-                            
-                        elif action == 'call_out_uno':
-                            target_id = data.get('data', {}).get('target_id')
-                            state = game_logic.handle_call_out_uno(state, str(user.token), target_id)
-                            
-                        elif action == 'kick_player':
-                            target_id = data.get('data', {}).get('target_id')
-                            delete_room_player_sync(db, room_code, str(user.token), target_id)
-                            state = state_manager.kick_player_from_state(room_code, target_id)
-                            
-                        elif action == 'leave_room':
-                            room = db.query(Room).filter(Room.code == room_code).first()
-                            if room and str(room.host_id) == str(user.token):
-                                room_was_closed_by_host = True
-                            delete_room_player_sync(db, room_code, str(user.token), str(user.token), is_leave=True)
-                            state = state_manager.kick_player_from_state(room_code, str(user.token))
-                            
-                        elif action == 'reset_to_lobby':
-                            if state.get('game_status') not in ('FINISHED', 'PLAYING'):
-                                raise ValueError("Game is not finished yet.")
-                            db_players = reset_room_in_db_sync(db, room_code, str(user.token))
-                            players_list = []
-                            for p in db_players:
-                                players_list.append({
-                                    'id': str(p.user.token),
-                                    'name': p.user.nickname,
-                                    'is_connected': True,
-                                    'called_uno': False,
-                                    'avatar_url': get_avatar_url_helper(p.user.avatar, str(websocket.base_url))
-                                })
-                            state = {
-                                'room_code': room_code,
-                                'game_status': 'LOBBY',
-                                'version': state.get('version', 0),
-                                'players': players_list,
-                                'hands': {},
-                                'deck': [],
-                                'discard_pile': ['R_0'],
-                                'current_turn': 0,
-                                'direction': 1
-                            }
-                        else:
-                            raise ValueError(f"Unknown action type: {action}")
-                            
-                        if state.get('game_status') == 'FINISHED' or room_was_closed_by_host:
-                            finalize_game_in_db_sync(db, room_code)
-                            
-                        updated_state = state_manager.save_state(room_code, state)
-                        if event_id:
-                            state_manager.mark_event_processed(room_code, event_id)
-                            
-                    await manager.broadcast_room_state(room_code, updated_state)
-                    
-                    if action == 'kick_player':
-                        target_id = data.get('data', {}).get('target_id')
-                        await manager.broadcast_to_room(room_code, {
-                            "type": "player_kicked",
-                            "target_id": target_id,
-                            "message": "You have been kicked by the host."
-                        })
-                    elif action == 'leave_room' and room_was_closed_by_host:
-                        await manager.broadcast_to_room(room_code, {
-                            "type": "room_closed",
-                            "message": "The host has closed the room."
-                        })
-                        
+                    await process_game_action_core(
+                        db=db,
+                        state_manager=state_manager,
+                        room_code=room_code,
+                        user=user,
+                        action=action,
+                        data=data.get('data', {}),
+                        event_id=event_id,
+                        client_version=client_version,
+                        base_url=str(websocket.base_url)
+                    )
                 except VersionMismatchError as e:
                     await websocket.send_json({"type": "error", "error_type": "version_mismatch", "message": str(e)})
                     # Resend current state to sync client

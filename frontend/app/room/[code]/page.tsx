@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect, react-hooks/immutability, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @next/next/no-img-element */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   getStoredGuest,
@@ -344,13 +344,6 @@ export default function RoomPage() {
           const color = parts[0];
           const val = parts[1];
 
-          const playerWhoPlayed = prev.players[prev.current_turn];
-          if (playerWhoPlayed) {
-            const formattedCard = getCardName(color, val);
-            const name = playerWhoPlayed.id === guest?.token ? "You" : playerWhoPlayed.name;
-            showAlert(`${name} played ${formattedCard}`, "success");
-          }
-
           if (val === "WildDraw4") {
             gameSounds.play("playPlus4");
           } else if (val === "Draw2") {
@@ -390,14 +383,29 @@ export default function RoomPage() {
         const currMyPlayer = current.players.find((p) => p.id === guest?.token);
         if (currMyPlayer?.called_uno && !prevMyPlayer?.called_uno) {
           gameSounds.play("unoShout");
+          showAlert("You declared UNO!", "success");
         } else {
           // Check if any other player declared UNO
           for (const p of current.players) {
             const prevP = prev.players.find((x) => x.id === p.id);
             if (p.called_uno && !prevP?.called_uno) {
               gameSounds.play("unoShout");
+              showAlert(`${p.name} declared UNO!`, "success");
               break;
             }
+          }
+        }
+
+        // Detect UNO callout (someone caught a player who didn't declare UNO)
+        for (const p of current.players) {
+          const prevP = prev.players.find((x) => x.id === p.id);
+          if (prevP && prevP.card_count === 1 && !prevP.called_uno && p.card_count >= 5) {
+            if (p.id === guest?.token) {
+              showAlert("You were called out for not declaring UNO (+4 cards)!", "error");
+            } else {
+              showAlert(`${p.name} was called out for not declaring UNO (+4 cards)!`, "success");
+            }
+            break;
           }
         }
       }
@@ -489,6 +497,67 @@ export default function RoomPage() {
     }
   }
 
+  const handleStateUpdate = useCallback((data: any) => {
+    if (data.type === "game_state_update") {
+      const state: FilteredGameState = data.state;
+      const version: number = data.version;
+
+      if (version < localVersionRef.current) {
+        return;
+      }
+
+      localVersionRef.current = version;
+      setGameState(state);
+
+      if (pendingPenaltyDrawsRef.current > 0 && (state.draw_penalty || 0) > 0) {
+        const activePlayerId = state.players[state.current_turn]?.id;
+        const myToken = typeof window !== "undefined" ? localStorage.getItem("uno_guest_token") : null;
+        if (activePlayerId === myToken) {
+          pendingPenaltyDrawsRef.current -= 1;
+          sendSocketMessage("draw_card");
+        } else {
+          pendingPenaltyDrawsRef.current = 0;
+        }
+      } else if ((state.draw_penalty || 0) === 0) {
+        pendingPenaltyDrawsRef.current = 0;
+      }
+    }
+  }, []);
+
+  // HTTP Polling Fallback: Automatically polls when WebSocket is disconnected
+  useEffect(() => {
+    if (wsConnected) return;
+
+    const pollInterval = setInterval(async () => {
+      if (isUnmountedRef.current) return;
+      try {
+        let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        if (typeof window !== "undefined" && window.location.protocol === "https:" && apiBase.startsWith("http:")) {
+          apiBase = apiBase.replace(/^http:/, "https:");
+        }
+        const stored = getStoredGuest();
+        if (!stored?.token) return;
+
+        const res = await fetch(`${apiBase}/api/rooms/${roomCode}/state/`, {
+          headers: {
+            Authorization: `Bearer ${stored.token}`,
+          },
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.type === "game_state_update") {
+            handleStateUpdate(resData);
+          }
+        }
+      } catch (e) {
+        // Silent catch during polling interval
+      }
+    }, 1500);
+
+    return () => clearInterval(pollInterval);
+  }, [wsConnected, roomCode, handleStateUpdate]);
+
   function connectWebSocket(token: string) {
     // Don't connect if component is unmounted
     if (isUnmountedRef.current) return;
@@ -501,9 +570,15 @@ export default function RoomPage() {
       socketRef.current = null;
     }
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    if (typeof window !== "undefined" && window.location.protocol === "https:" && apiBase.startsWith("http:")) {
+      apiBase = apiBase.replace(/^http:/, "https:");
+    }
     const defaultWsBase = apiBase.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL || defaultWsBase;
+    let wsBase = process.env.NEXT_PUBLIC_WS_URL || defaultWsBase;
+    if (typeof window !== "undefined" && window.location.protocol === "https:" && wsBase.startsWith("ws:")) {
+      wsBase = wsBase.replace(/^ws:/, "wss:");
+    }
     const wsUrl = `${wsBase}/ws/room/${roomCode}?token=${token}`;
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
@@ -516,39 +591,8 @@ export default function RoomPage() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-
       if (data.type === "game_state_update") {
-        const state: FilteredGameState = data.state;
-        const version: number = data.version;
-
-        // Versioning: Ignore stale packets
-        if (version < localVersionRef.current) {
-          console.warn(
-            `Ignoring stale state update: received version ${version}, current is ${localVersionRef.current}`,
-          );
-          return;
-        }
-
-        localVersionRef.current = version;
-        setGameState(state);
-
-        // Sequential penalty draw loop:
-        // When pendingPenaltyDrawsRef > 0, we auto-send the next draw_card
-        // so the user only needs to click once to draw all penalty cards.
-        if (pendingPenaltyDrawsRef.current > 0 && (state.draw_penalty || 0) > 0) {
-          const activePlayerId = state.players[state.current_turn]?.id;
-          const myToken = localStorage.getItem("uno_guest_token");
-          if (activePlayerId === myToken) {
-            pendingPenaltyDrawsRef.current -= 1;
-            sendSocketMessage("draw_card");
-          } else {
-            // Turn changed unexpectedly — reset
-            pendingPenaltyDrawsRef.current = 0;
-          }
-        } else if ((state.draw_penalty || 0) === 0) {
-          // All penalty cards drawn — reset counter
-          pendingPenaltyDrawsRef.current = 0;
-        }
+        handleStateUpdate(data);
       } else if (data.type === "chat_message") {
         const msg: ChatMessage = data;
         setChatMessages((prev) => [...prev, msg]);
@@ -686,28 +730,51 @@ export default function RoomPage() {
     }
   }
 
-  function sendSocketMessage(type: string, data: any = {}) {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
-      // Give a more helpful message indicating reconnect is happening
-      const state = socketRef.current?.readyState;
-      if (state === WebSocket.CONNECTING) {
-        showAlert("Still connecting... please wait a moment and try again.");
-      } else {
-        showAlert(
-          "Connection lost. Reconnecting automatically — please try again in a moment.",
-        );
-      }
+  async function sendSocketMessage(type: string, data: any = {}) {
+    const eventId = crypto.randomUUID();
+    const payload = {
+      type,
+      event_id: eventId,
+      client_version: localVersionRef.current,
+      data,
+    };
+
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(payload));
       return;
     }
-    const eventId = crypto.randomUUID();
-    socketRef.current.send(
-      JSON.stringify({
-        type,
-        event_id: eventId,
-        client_version: localVersionRef.current,
-        data,
-      }),
-    );
+
+    // HTTP POST Fallback if WebSocket is not open
+    try {
+      let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      if (typeof window !== "undefined" && window.location.protocol === "https:" && apiBase.startsWith("http:")) {
+        apiBase = apiBase.replace(/^http:/, "https:");
+      }
+      const stored = getStoredGuest();
+      if (!stored?.token) return;
+
+      const res = await fetch(`${apiBase}/api/rooms/${roomCode}/action/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${stored.token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        showAlert(errJson.detail || errJson.message || "Failed to perform action.");
+        return;
+      }
+
+      const resData = await res.json();
+      if (resData.type === "game_state_update") {
+        handleStateUpdate(resData);
+      }
+    } catch (err) {
+      console.error("HTTP Fallback Action Error:", err);
+    }
   }
 
   function showAlert(msg: string, type: "success" | "error" = "error") {
@@ -855,7 +922,9 @@ export default function RoomPage() {
   function handleCallOutUno(targetId: string) {
     gameSounds.play("reportNoUno");
     sendSocketMessage("call_out_uno", { target_id: targetId });
-    showAlert("Calling out player!");
+    const targetPlayer = gameState?.players.find((p) => p.id === targetId);
+    const targetName = targetPlayer ? targetPlayer.name : "player";
+    showAlert(`Called out ${targetName} for not declaring UNO!`, "success");
   }
 
   function handleReportNoUno() {
